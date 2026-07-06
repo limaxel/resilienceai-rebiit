@@ -1,0 +1,1709 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ResilienceAI — Flood Decision Intelligence Command Center</title>
+<style>
+:root{
+  --bg:#0b1220;
+  --bg-2:#0d1526;
+  --panel:#101a2e;
+  --panel-2:#14213a;
+  --panel-3:#182741;
+  --border:rgba(148,163,184,0.14);
+  --border-strong:rgba(148,163,184,0.28);
+  --text:#e6edf6;
+  --text-dim:#9fb0c6;
+  --muted:#6b7c95;
+  --accent:#38bdf8;
+  --accent-2:#818cf8;
+  --accent-deep:#0ea5e9;
+  --low:#22c55e;
+  --moderate:#eab308;
+  --high:#f97316;
+  --severe:#ef4444;
+  --grid:rgba(148,163,184,0.12);
+  --axis:rgba(148,163,184,0.30);
+  --shadow:0 10px 30px rgba(0,0,0,0.35);
+  --radius:14px;
+  font-synthesis:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:
+    radial-gradient(1200px 600px at 82% -8%, rgba(56,189,248,0.08), transparent 60%),
+    radial-gradient(900px 500px at 8% 110%, rgba(129,140,248,0.07), transparent 55%),
+    var(--bg);
+  color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:14px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:rgba(148,163,184,0.25);border-radius:8px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- Header ---------- */
+.topbar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:18px;
+  padding:12px 24px;
+  background:linear-gradient(180deg, rgba(13,21,38,0.96), rgba(13,21,38,0.82));
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);
+}
+.brand{display:flex;align-items:center;gap:11px;min-width:220px}
+.brand .glyph{width:36px;height:36px;flex:none;filter:drop-shadow(0 2px 6px rgba(56,189,248,0.35))}
+.brand .name{font-size:16px;font-weight:700;letter-spacing:-0.01em}
+.brand .name b{color:var(--accent)}
+.brand .sub{font-size:11px;color:var(--muted);letter-spacing:0.02em}
+.nav{display:flex;gap:4px;flex:1;flex-wrap:wrap}
+.nav button{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 14px;border-radius:10px;border:1px solid transparent;
+  background:transparent;color:var(--text-dim);font-size:13px;font-weight:500;cursor:pointer;
+  transition:all .14s ease;
+}
+.nav button .ni{width:15px;height:15px;opacity:.85}
+.nav button:hover{background:var(--panel-2);color:var(--text)}
+.nav button.active{
+  background:linear-gradient(180deg,rgba(56,189,248,0.18),rgba(56,189,248,0.08));
+  color:#fff;border-color:rgba(56,189,248,0.4);
+}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.status-pill{
+  display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);
+  padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:var(--panel);
+}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--low);box-shadow:0 0 0 0 rgba(34,197,94,0.6);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)}70%{box-shadow:0 0 0 7px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.gear{
+  width:38px;height:38px;border-radius:10px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.gear:hover{color:var(--text);border-color:var(--border-strong)}
+
+/* ---------- Layout ---------- */
+.view{display:none;padding:22px 24px 40px;max-width:1860px;margin:0 auto}
+.view.active{display:block}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px;gap:20px;flex-wrap:wrap}
+.page-head h1{font-size:20px;font-weight:700;margin:0;letter-spacing:-0.01em}
+.page-head p{margin:3px 0 0;color:var(--text-dim);font-size:13px}
+.head-tags{display:flex;gap:8px;flex-wrap:wrap}
+.tag{font-size:11px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text-dim);display:flex;align-items:center;gap:6px}
+.tag b{color:var(--text)}
+
+.panel{
+  background:linear-gradient(180deg,var(--panel),var(--bg-2));
+  border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);
+}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.panel-head h2{font-size:14px;font-weight:600;margin:0;letter-spacing:.01em;display:flex;align-items:center;gap:9px}
+.panel-head .ph-sub{font-size:11.5px;color:var(--muted)}
+.panel-body{padding:16px 18px}
+
+/* ---------- KPI tiles ---------- */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+.kpi{
+  position:relative;overflow:hidden;
+  background:linear-gradient(180deg,var(--panel-2),var(--bg-2));
+  border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;
+}
+.kpi::after{content:"";position:absolute;inset:0;border-radius:var(--radius);pointer-events:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
+.kpi .k-top{display:flex;align-items:center;justify-content:space-between}
+.kpi .k-label{font-size:12px;color:var(--text-dim);font-weight:500}
+.kpi .k-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border)}
+.kpi .k-val{font-size:32px;font-weight:700;letter-spacing:-0.02em;margin-top:8px;line-height:1.05}
+.kpi .k-val .unit{font-size:15px;font-weight:600;color:var(--text-dim);margin-left:3px}
+.kpi .k-delta{font-size:12px;margin-top:6px;display:flex;align-items:center;gap:6px;color:var(--text-dim)}
+.k-delta .up{color:var(--high)}
+.k-delta .down{color:var(--low)}
+.k-accent-low{border-left:3px solid var(--low)}
+.k-accent-high{border-left:3px solid var(--high)}
+.k-accent-accent{border-left:3px solid var(--accent)}
+.k-accent-mod{border-left:3px solid var(--moderate)}
+.mini-track{height:5px;border-radius:4px;background:rgba(148,163,184,0.15);margin-top:12px;overflow:hidden}
+.mini-track > span{display:block;height:100%;border-radius:4px}
+
+/* dashboard grid */
+.dash-grid{display:grid;grid-template-columns:1.32fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:1180px){.dash-grid{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}}
+
+/* ---------- Map ---------- */
+.map-wrap{position:relative}
+.map-svg{width:100%;height:auto;display:block;border-radius:10px}
+.district{cursor:pointer;transition:filter .15s ease, opacity .15s ease}
+.district:hover{filter:brightness(1.18) saturate(1.1)}
+.district-label{font-size:12px;font-weight:600;fill:#fff;pointer-events:none;paint-order:stroke;stroke:rgba(0,0,0,0.45);stroke-width:2.4px;letter-spacing:.01em}
+.district-sub{font-size:9.5px;fill:rgba(255,255,255,0.82);pointer-events:none;paint-order:stroke;stroke:rgba(0,0,0,0.4);stroke-width:2px}
+.map-legend{display:flex;gap:18px;flex-wrap:wrap;padding:12px 4px 2px;align-items:center}
+.leg-item{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-dim)}
+.leg-sw{width:13px;height:13px;border-radius:4px}
+.map-tooltip{
+  position:absolute;pointer-events:none;z-index:20;min-width:190px;
+  background:rgba(9,15,28,0.97);border:1px solid var(--border-strong);border-radius:10px;
+  padding:11px 13px;box-shadow:0 12px 30px rgba(0,0,0,0.5);opacity:0;transform:translateY(4px);
+  transition:opacity .12s ease, transform .12s ease;font-size:12px;
+}
+.map-tooltip.show{opacity:1;transform:translateY(0)}
+.mt-name{font-weight:700;font-size:13px;margin-bottom:2px}
+.mt-risk{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;display:inline-block;margin-bottom:8px}
+.mt-row{display:flex;justify-content:space-between;gap:16px;color:var(--text-dim);padding:2px 0}
+.mt-row b{color:var(--text);font-variant-numeric:tabular-nums}
+
+/* ---------- Charts ---------- */
+.chart-title{font-size:12.5px;font-weight:600;color:var(--text);margin:2px 2px 2px}
+.chart-sub{font-size:11px;color:var(--muted);margin-bottom:2px}
+.chart-svg{width:100%;height:auto;display:block;overflow:visible}
+.axis-label{fill:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums}
+.axis-title{fill:var(--text-dim);font-size:11px;font-weight:500}
+.grid-line{stroke:var(--grid);stroke-width:1}
+.axis-line{stroke:var(--axis);stroke-width:1}
+.chart-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;padding-left:4px}
+.cl-item{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text-dim)}
+.cl-key{width:16px;height:3px;border-radius:2px}
+.cl-key.band{height:10px;width:16px;border-radius:3px;opacity:.85}
+
+/* ---------- Sensor ticker ---------- */
+.ticker{max-height:196px;overflow:hidden;position:relative}
+.ticker-list{display:flex;flex-direction:column}
+.ticker-row{
+  display:grid;grid-template-columns:150px 1fr 120px 130px 90px;gap:14px;align-items:center;
+  padding:9px 14px;border-bottom:1px solid var(--border);font-size:12.5px;
+}
+.ticker-row:hover{background:var(--panel-2)}
+.sensor-id{font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;font-size:11.5px;color:var(--accent);font-weight:600}
+.sensor-name{color:var(--text-dim)}
+.sensor-val{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+.trend-up{color:var(--high)}
+.trend-flat{color:var(--text-dim)}
+.trend-down{color:var(--low)}
+.chip-status{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:6px;text-align:center;justify-self:start}
+
+/* ---------- Copilot ---------- */
+.copilot-layout{display:grid;grid-template-columns:270px 1fr;gap:16px;height:calc(100vh - 150px);min-height:560px}
+@media(max-width:1000px){.copilot-layout{grid-template-columns:1fr}}
+.co-side .panel-body{padding:14px}
+.co-side h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:2px 0 10px}
+.chip{
+  display:block;width:100%;text-align:left;margin-bottom:8px;padding:11px 13px;
+  background:var(--panel-2);border:1px solid var(--border);border-radius:10px;color:var(--text-dim);
+  font-size:12.5px;cursor:pointer;transition:all .14s;line-height:1.35;
+}
+.chip:hover{border-color:var(--accent);color:var(--text);background:var(--panel-3)}
+.co-ctx{margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:10px;background:rgba(56,189,248,0.05);font-size:11.5px;color:var(--text-dim)}
+.co-ctx b{color:var(--text)}
+.co-ctx .ctx-row{display:flex;justify-content:space-between;padding:2px 0}
+.chat-panel{display:flex;flex-direction:column;overflow:hidden}
+.chat-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--border)}
+.chat-head .mode-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;display:flex;align-items:center;gap:6px}
+.mode-demo{background:rgba(129,140,248,0.14);color:#b6bdf9;border:1px solid rgba(129,140,248,0.3)}
+.mode-live{background:rgba(34,197,94,0.14);color:#7fe6a5;border:1px solid rgba(34,197,94,0.3)}
+.chat-scroll{flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:18px}
+.msg{display:flex;gap:12px;max-width:860px}
+.msg .ava{width:32px;height:32px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.ava.ai{background:linear-gradient(160deg,#0ea5e9,#6366f1);color:#fff}
+.ava.user{background:var(--panel-3);color:var(--text-dim);border:1px solid var(--border)}
+.msg.user{align-self:flex-end;flex-direction:row-reverse}
+.bubble{padding:13px 16px;border-radius:13px;font-size:13.5px;line-height:1.55}
+.msg.ai .bubble{background:var(--panel-2);border:1px solid var(--border);border-top-left-radius:4px}
+.msg.user .bubble{background:linear-gradient(160deg,rgba(56,189,248,0.18),rgba(56,189,248,0.08));border:1px solid rgba(56,189,248,0.28);border-top-right-radius:4px;color:#eaf6ff}
+.bubble p{margin:0 0 9px}.bubble p:last-child{margin-bottom:0}
+.bubble ol,.bubble ul{margin:6px 0 9px;padding-left:20px}
+.bubble li{margin-bottom:5px}
+.bubble strong{color:#fff}
+.risk-inline{font-weight:700;padding:1px 6px;border-radius:4px;font-size:11.5px;letter-spacing:.03em}
+.cite-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px;padding-top:10px;border-top:1px solid var(--border)}
+.cite{font-size:10.5px;color:var(--text-dim);background:var(--panel-3);border:1px solid var(--border);padding:3px 9px;border-radius:6px;display:flex;align-items:center;gap:5px}
+.advisory{border:1px solid var(--border-strong);border-radius:11px;overflow:hidden;margin:10px 0 4px}
+.adv-lang{padding:12px 14px;border-bottom:1px solid var(--border)}
+.adv-lang:last-child{border-bottom:none}
+.adv-flag{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;display:flex;align-items:center;gap:7px}
+.adv-lang.id .adv-flag{color:var(--accent-2)}
+.adv-body{font-size:12.5px;line-height:1.5;color:var(--text)}
+.chat-input-wrap{padding:14px 18px;border-top:1px solid var(--border)}
+.chat-form{display:flex;gap:10px;align-items:flex-end}
+.chat-input{
+  flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:11px;
+  padding:12px 14px;color:var(--text);font-size:13.5px;font-family:inherit;resize:none;min-height:46px;max-height:120px;
+}
+.chat-input:focus{outline:none;border-color:var(--accent)}
+.send-btn{
+  width:46px;height:46px;flex:none;border-radius:11px;border:none;cursor:pointer;
+  background:linear-gradient(160deg,#0ea5e9,#6366f1);color:#fff;display:flex;align-items:center;justify-content:center;
+}
+.send-btn:hover{filter:brightness(1.1)}
+.typing{display:flex;gap:4px;padding:4px 2px}
+.typing span{width:7px;height:7px;border-radius:50%;background:var(--text-dim);animation:blink 1.3s infinite}
+.typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
+
+/* ---------- Reports ---------- */
+.reports-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(370px,1fr));gap:16px}
+.report-card{background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.rc-top{display:flex;gap:13px;padding:13px}
+.rc-thumb{width:96px;height:96px;flex:none;border-radius:9px;overflow:hidden;border:1px solid var(--border);background:#0a1424}
+.rc-thumb svg{width:100%;height:100%;display:block}
+.rc-main{flex:1;min-width:0}
+.rc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rc-id{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--accent);font-weight:600}
+.rc-time{font-size:11px;color:var(--muted)}
+.rc-loc{font-size:12px;color:var(--text-dim);margin:4px 0 2px;display:flex;align-items:center;gap:5px}
+.rc-text{font-size:12.5px;color:var(--text);line-height:1.4;margin-top:5px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.rc-badges{display:flex;gap:7px;flex-wrap:wrap;padding:0 13px 12px}
+.badge{font-size:10.5px;font-weight:600;padding:4px 9px;border-radius:7px;display:flex;align-items:center;gap:5px;border:1px solid transparent}
+.badge .bi{width:12px;height:12px}
+.badge-type{background:var(--panel-3);color:var(--text-dim);border-color:var(--border)}
+.badge-dup{background:rgba(234,179,8,0.12);color:#f0cf5e;border-color:rgba(234,179,8,0.32)}
+.badge-ai{background:rgba(56,189,248,0.1);color:var(--accent);border-color:rgba(56,189,248,0.28)}
+.rc-actions{display:flex;gap:9px;padding:11px 13px;border-top:1px solid var(--border);margin-top:auto}
+.rc-btn{flex:1;padding:8px;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--panel-2);color:var(--text-dim);display:flex;align-items:center;justify-content:center;gap:6px;transition:all .13s}
+.rc-btn.verify:hover{background:rgba(34,197,94,0.14);color:#7fe6a5;border-color:rgba(34,197,94,0.35)}
+.rc-btn.dismiss:hover{background:rgba(239,68,68,0.12);color:#f39898;border-color:rgba(239,68,68,0.32)}
+.rc-btn.done{opacity:.6;cursor:default}
+.conf-mini{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted)}
+.conf-bar{width:44px;height:4px;border-radius:3px;background:rgba(148,163,184,0.2);overflow:hidden}
+.conf-bar>span{display:block;height:100%;background:var(--accent)}
+
+/* ---------- Submit citizen report ---------- */
+.submit-card{margin-bottom:18px}
+.submit-grid{display:grid;grid-template-columns:300px 1fr;gap:18px}
+@media(max-width:720px){.submit-grid{grid-template-columns:1fr}}
+.dropzone{
+  position:relative;min-height:172px;border:1.6px dashed var(--border-strong);border-radius:12px;
+  background:var(--panel-2);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:14px;transition:border-color .14s, background .14s;
+}
+.dropzone:hover,.dropzone:focus{outline:none;border-color:var(--accent);background:var(--panel-3)}
+.dropzone.drag{border-color:var(--accent);background:rgba(56,189,248,0.08)}
+.dz-empty{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text-dim);pointer-events:none}
+.dz-empty svg{opacity:.85}
+.dz-main{font-size:13px;color:var(--text)}
+.dz-link{color:var(--accent);font-weight:600}
+.dz-sub{font-size:11px;color:var(--muted)}
+.dz-preview{max-width:100%;max-height:150px;border-radius:9px;display:block;object-fit:cover;border:1px solid var(--border)}
+.dz-empty[hidden],.dz-preview[hidden]{display:none}
+.submit-right{display:flex;flex-direction:column;gap:12px}
+.note-input{
+  flex:1;min-height:96px;background:var(--panel-2);border:1px solid var(--border);border-radius:11px;
+  padding:12px 14px;color:var(--text);font-size:13px;font-family:inherit;resize:vertical;line-height:1.5;
+}
+.note-input:focus{outline:none;border-color:var(--accent)}
+.submit-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.classify-btn{display:flex;align-items:center;gap:8px}
+.classify-btn:disabled{opacity:.6;cursor:default}
+.triage-msg{font-size:11.5px;color:var(--muted);line-height:1.4}
+.triage-msg.ok{color:#7fe6a5}
+.triage-msg.err{color:#f0cf5e}
+
+/* live-classified report card */
+.rc-live-card{border-color:rgba(56,189,248,0.4);box-shadow:0 0 0 1px rgba(56,189,248,0.16),var(--shadow)}
+.rc-live-banner{font-size:10px;font-weight:700;letter-spacing:.05em;padding:6px 13px;display:flex;align-items:center;gap:7px;text-transform:uppercase}
+.rc-live-banner .lb-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.rc-live-banner.rc-live{background:rgba(34,197,94,0.14);color:#7fe6a5;border-bottom:1px solid rgba(34,197,94,0.28)}
+.rc-live-banner.rc-live-demo{background:rgba(129,140,248,0.14);color:#b6bdf9;border-bottom:1px solid rgba(129,140,248,0.28)}
+.rc-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* ---------- Actions ---------- */
+.actions-list{display:flex;flex-direction:column;gap:14px}
+.action-card{background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--border);border-radius:13px;overflow:hidden}
+.ac-main{display:flex;gap:16px;padding:16px 18px}
+.ac-rank{width:40px;height:40px;flex:none;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff}
+.ac-body{flex:1;min-width:0}
+.ac-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.ac-title{font-size:15px;font-weight:700;margin:0}
+.ac-cat{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:3px 9px;border-radius:6px;border:1px solid var(--border);color:var(--text-dim);background:var(--panel-2)}
+.ac-reason{font-size:13px;color:var(--text-dim);margin:8px 0 12px;line-height:1.5}
+.ac-metrics{display:flex;gap:26px;flex-wrap:wrap}
+.ac-metric{display:flex;flex-direction:column;gap:3px}
+.ac-metric .m-label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.ac-metric .m-val{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.ac-metric .conf-wrap{display:flex;align-items:center;gap:9px}
+.ac-metric .conf-bar2{width:90px;height:6px;border-radius:4px;background:rgba(148,163,184,0.2);overflow:hidden}
+.ac-metric .conf-bar2>span{display:block;height:100%}
+.ac-explain-btn{margin-top:13px;font-size:12px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:0}
+.ac-explain-btn .chev{transition:transform .18s}
+.ac-explain-btn.open .chev{transform:rotate(180deg)}
+.ac-explain{display:none;padding:0 18px 16px 74px}
+.ac-explain.open{display:block}
+.ac-explain-inner{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:12.5px;color:var(--text-dim);line-height:1.55}
+.ac-explain-inner h4{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.ac-explain-inner ul{margin:0;padding-left:18px}
+.ac-explain-inner li{margin-bottom:5px}
+.ac-explain-inner li b{color:var(--text)}
+
+/* ---------- Scenario ---------- */
+.scenario-grid{display:grid;grid-template-columns:340px 1fr;gap:16px}
+@media(max-width:1000px){.scenario-grid{grid-template-columns:1fr}}
+.control-group{margin-bottom:22px}
+.control-group label{display:block;font-size:12.5px;font-weight:600;margin-bottom:10px}
+.control-group .cg-val{color:var(--accent);font-variant-numeric:tabular-nums}
+.control-group .cg-hint{font-size:11px;color:var(--muted);font-weight:400;margin-top:2px}
+input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:4px;background:linear-gradient(90deg,var(--accent) 0%,var(--accent) 50%,rgba(148,163,184,0.2) 50%);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--accent);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.4)}
+.track-select{display:flex;flex-direction:column;gap:8px}
+.track-opt{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .13s;background:var(--panel-2)}
+.track-opt:hover{border-color:var(--border-strong)}
+.track-opt.active{border-color:var(--accent);background:var(--panel-3)}
+.track-opt .to-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--muted);flex:none;position:relative}
+.track-opt.active .to-radio{border-color:var(--accent)}
+.track-opt.active .to-radio::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--accent)}
+.track-opt .to-txt{font-size:12.5px}
+.track-opt .to-txt small{display:block;color:var(--muted);font-size:11px}
+.scenario-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px}
+.ss-tile{text-align:center;padding:11px 6px;border-radius:10px;border:1px solid var(--border)}
+.ss-tile .ss-n{font-size:24px;font-weight:800;line-height:1}
+.ss-tile .ss-l{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:4px}
+.scenario-delta{margin-top:16px;padding:13px 15px;border-radius:11px;border:1px solid var(--border);background:rgba(249,115,22,0.06);font-size:12.5px;color:var(--text-dim);line-height:1.5}
+.scenario-delta b{color:var(--text)}
+.sc-district-list{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:4px}
+.scd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);font-size:12.5px}
+.scd .scd-badge{font-size:10px;font-weight:700;letter-spacing:.05em;padding:2px 8px;border-radius:5px;text-transform:uppercase}
+.scd .scd-change{font-size:10.5px;color:var(--muted);margin-left:6px}
+
+/* ---------- Settings modal ---------- */
+.modal-overlay{position:fixed;inset:0;z-index:100;background:rgba(4,8,16,0.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{width:480px;max-width:92vw;background:var(--panel);border:1px solid var(--border-strong);border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,0.6);overflow:hidden}
+.modal-head{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-head h3{margin:0;font-size:15px}
+.modal-body{padding:20px}
+.modal-body label{font-size:12.5px;font-weight:600;display:block;margin-bottom:8px}
+.modal-body input{width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);font-size:13px;font-family:ui-monospace,Menlo,monospace}
+.modal-body input:focus{outline:none;border-color:var(--accent)}
+.modal-note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+.modal-note a{color:var(--accent)}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+.btn{padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--panel-2);color:var(--text)}
+.btn.primary{background:linear-gradient(160deg,#0ea5e9,#6366f1);border:none;color:#fff}
+.btn:hover{filter:brightness(1.08)}
+.mode-status{font-size:12px;padding:9px 12px;border-radius:9px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.x-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1}
+.x-btn:hover{color:var(--text)}
+.no-anim *{animation:none !important;transition:none !important}
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="topbar">
+  <div class="brand">
+    <svg class="glyph" viewBox="0 0 48 48" fill="none" aria-label="ResilienceAI logo">
+      <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs>
+      <path d="M24 3c8 4 14 5 18 5 0 16-6 27-18 32C12 35 6 24 6 8c4 0 10-1 18-5z" fill="url(#lg)" opacity="0.18" stroke="url(#lg)" stroke-width="2"/>
+      <path d="M11 25c3.2 0 3.2-3 6.5-3s3.3 3 6.5 3 3.2-3 6.5-3 3.3 3 6.5 3" stroke="#38bdf8" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+      <path d="M11 31c3.2 0 3.2-3 6.5-3s3.3 3 6.5 3 3.2-3 6.5-3 3.3 3 6.5 3" stroke="#818cf8" stroke-width="2.4" stroke-linecap="round" fill="none" opacity="0.75"/>
+    </svg>
+    <div>
+      <div class="name">Resilience<b>AI</b></div>
+      <div class="sub">Delta City · Flood Command Center</div>
+    </div>
+  </div>
+  <nav class="nav" id="nav"></nav>
+  <div class="topbar-right">
+    <div class="status-pill"><span class="live-dot"></span> Monsoon watch · Live</div>
+    <button class="gear" id="gearBtn" title="Settings — Gemini API key" aria-label="Settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ============ VIEWS ============ -->
+<section id="view-dashboard" class="view">
+  <div class="page-head">
+    <div>
+      <h1>Operations Dashboard</h1>
+      <p>Real-time flood risk across Delta City's 8 districts · tropical storm approaching, monsoon season</p>
+    </div>
+    <div class="head-tags">
+      <span class="tag"><b>42</b> IoT gauges</span>
+      <span class="tag"><b>Vertex AI</b> forecast · updated 2 min ago</span>
+      <span class="tag">Last sync <b id="syncTime">now</b></span>
+    </div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <div class="dash-grid">
+    <div class="panel map-wrap">
+      <div class="panel-head">
+        <h2><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><path d="M9 20l-6 2V6l6-2 6 2 6-2v16l-6 2-6-2z"/><path d="M9 4v16M15 6v16"/></svg> Live Risk Map</h2>
+        <span class="ph-sub">Hover a district for gauge &amp; population detail</span>
+      </div>
+      <div class="panel-body">
+        <div id="mapMount"></div>
+        <div class="map-legend" id="mapLegend"></div>
+      </div>
+      <div class="map-tooltip" id="mapTooltip"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M19 9l-5 5-3-3-4 4"/></svg> 72-Hour Risk Forecast</h2>
+        <span class="ph-sub">Riverside North gauge · Vertex AI</span>
+      </div>
+      <div class="panel-body" id="forecastMount"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Live Sensor Stream <span style="font-size:11px;color:var(--low);font-weight:500;margin-left:4px">● streaming</span></h2>
+      <span class="ph-sub">BigQuery ML anomaly detection active</span>
+    </div>
+    <div class="ticker" id="tickerMount"></div>
+  </div>
+</section>
+
+<section id="view-assistant" class="view">
+  <div class="page-head">
+    <div>
+      <h1>AI Response Assistant</h1>
+      <p>Gemini 2.5 · grounded, explainable answers over live Delta City data</p>
+    </div>
+  </div>
+  <div class="copilot-layout">
+    <div class="panel co-side">
+      <div class="panel-body">
+        <h3>Suggested questions</h3>
+        <div id="chipMount"></div>
+        <div class="co-ctx">
+          <div style="font-weight:700;color:var(--text);margin-bottom:7px">Live context in prompt</div>
+          <div class="ctx-row"><span>Storm status</span><b>Approaching</b></div>
+          <div class="ctx-row"><span>HIGH-risk districts</span><b>2</b></div>
+          <div class="ctx-row"><span>Population at risk</span><b>1.18M</b></div>
+          <div class="ctx-row"><span>Gauges online</span><b>40 / 42</b></div>
+          <div class="ctx-row"><span>Shelter spaces open</span><b>18,400</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel chat-panel">
+      <div class="chat-head">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="ava ai" style="width:28px;height:28px;border-radius:8px">AI</div>
+          <div><div style="font-weight:600;font-size:13px">Response Assistant</div><div style="font-size:11px;color:var(--muted)">Root agent · Data Analyst + Comms + Response Planner</div></div>
+        </div>
+        <div class="mode-badge mode-demo" id="modeBadge"><span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block"></span> Demo mode</div>
+      </div>
+      <div class="chat-scroll" id="chatScroll"></div>
+      <div class="chat-input-wrap">
+        <form class="chat-form" id="chatForm">
+          <textarea class="chat-input" id="chatInput" rows="1" placeholder="Ask about evacuation priority, shelters, advisories, resource allocation…"></textarea>
+          <button class="send-btn" type="submit" aria-label="Send">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="view-reports" class="view">
+  <div class="page-head">
+    <div>
+      <h1>Citizen Reports Triage</h1>
+      <p>Gemini multimodal classifies severity &amp; type, flags duplicates and spam for operator verification</p>
+    </div>
+    <div class="head-tags">
+      <span class="tag"><b id="rpUnverified">10</b> awaiting review</span>
+      <span class="tag"><b>3</b> duplicate clusters</span>
+      <span class="tag">Firestore + Cloud Storage feed</span>
+    </div>
+  </div>
+
+  <div class="panel submit-card" id="submitReportCard">
+    <div class="panel-head">
+      <h2><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Submit citizen report</h2>
+      <span class="ph-sub" id="triageModeHint">Demo mode · sample classification</span>
+    </div>
+    <div class="panel-body">
+      <div class="submit-grid">
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload citizen photo">
+          <input type="file" id="photoInput" accept="image/*" hidden />
+          <div class="dz-empty" id="dzEmpty">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v13"/></svg>
+            <div class="dz-main">Drop a photo here or <span class="dz-link">click to upload</span></div>
+            <div class="dz-sub">Geotagged citizen photo · JPG / PNG</div>
+          </div>
+          <img class="dz-preview" id="dzPreview" alt="Uploaded citizen photo" hidden />
+        </div>
+        <div class="submit-right">
+          <textarea class="note-input" id="noteInput" placeholder="Optional note from the citizen — location, what they're seeing, when it started…"></textarea>
+          <div class="submit-actions">
+            <button class="btn primary classify-btn" id="classifyBtn" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.4 2.3 7.2L12 16.5 5.7 20.8 8 13.6 2 9.2h7.6z"/></svg>
+              Classify with AI
+            </button>
+            <span class="triage-msg" id="triageMsg"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reports-grid" id="reportsMount"></div>
+</section>
+
+<section id="view-actions" class="view">
+  <div class="page-head">
+    <div>
+      <h1>Ranked Action Recommendations</h1>
+      <p>Response Planner Agent · RAG over emergency SOPs (Vertex AI Search) · human-in-the-loop confirmation required</p>
+    </div>
+    <div class="head-tags">
+      <span class="tag"><b>6</b> recommendations</span>
+      <span class="tag">Prioritized by risk × population × time-to-impact</span>
+    </div>
+  </div>
+  <div class="actions-list" id="actionsMount"></div>
+</section>
+
+<section id="view-scenario" class="view">
+  <div class="page-head">
+    <div>
+      <h1>What-If Scenario Simulator</h1>
+      <p>Adjust rainfall intensity and storm track — risk map and district levels recompute instantly</p>
+    </div>
+    <div class="head-tags">
+      <span class="tag">Vertex AI forecast model · live recompute</span>
+    </div>
+  </div>
+  <div class="scenario-grid">
+    <div class="panel">
+      <div class="panel-head"><h2>Simulation controls</h2></div>
+      <div class="panel-body">
+        <div class="control-group">
+          <label>Rainfall intensity <span class="cg-val" id="rainVal">180 mm</span> / 48h
+            <div class="cg-hint">National weather service currently forecasts 180 mm</div>
+          </label>
+          <input type="range" id="rainSlider" min="20" max="320" step="5" value="180" />
+        </div>
+        <div class="control-group">
+          <label>Storm track</label>
+          <div class="track-select" id="trackSelect"></div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;font-weight:600">Districts by risk level</div>
+        <div class="scenario-summary" id="scenarioSummary"></div>
+        <div class="scenario-delta" id="scenarioDelta"></div>
+      </div>
+    </div>
+    <div class="panel map-wrap">
+      <div class="panel-head">
+        <h2>Projected risk map</h2>
+        <span class="ph-sub" id="scenarioScenarioLabel">Baseline scenario</span>
+      </div>
+      <div class="panel-body">
+        <div id="scenarioMapMount"></div>
+        <div class="map-legend" id="scenarioLegend"></div>
+        <div class="sc-district-list" id="scDistrictList" style="margin-top:14px"></div>
+      </div>
+      <div class="map-tooltip" id="scenarioTooltip"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Settings · Gemini Integration</h3>
+      <button class="x-btn" id="modalClose">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="mode-status" id="modalModeStatus"></div>
+      <label>Gemini API key</label>
+      <input type="password" id="apiKeyInput" placeholder="AIza… (stored locally in your browser only)" />
+      <div class="modal-note">
+        With a key set, the Assistant calls <b>gemini-2.5-flash</b> live via the Generative Language API, grounded on the current simulated city state. Without a key it runs in <b>demo mode</b> with curated responses. The key is saved to <b>localStorage</b> on this device and never sent anywhere except Google's API. Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="clearKeyBtn">Clear key</button>
+      <button class="btn primary" id="saveKeyBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   ResilienceAI — self-contained flood decision-intelligence app
+   ============================================================ */
+const RISK = {
+  LOW:      {label:"LOW",      color:"#22c55e"},
+  MODERATE: {label:"MODERATE", color:"#eab308"},
+  HIGH:     {label:"HIGH",     color:"#f97316"},
+  SEVERE:   {label:"SEVERE",   color:"#ef4444"}
+};
+const ACCENT="#38bdf8", ACCENT2="#818cf8";
+
+const params = new URLSearchParams(location.search);
+const SHOT = params.get("shot")==="1";
+if(SHOT) document.body.classList.add("no-anim");
+
+/* ---------- Backend-aware routing ----------
+   Priority everywhere: backend > direct Gemini key > demo mode.
+   On load we probe /api/health; if it returns {mode:"live"} we route all
+   Gemini calls through the backend (key managed server-side). On file://
+   or with no backend, this fails silently/instantly and behavior is unchanged. */
+let BACKEND = false;
+async function checkBackend(){
+  try{
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>ctrl.abort(), 1500);
+    const res = await fetch("/api/health", {signal:ctrl.signal, cache:"no-store"});
+    clearTimeout(t);
+    if(!res.ok) return;
+    const j = await res.json();
+    if(j && j.mode === "live"){ BACKEND = true; refreshMode(); }
+  }catch(e){ /* file:// or no backend — stay in direct-key / demo mode */ }
+}
+function isLive(){ return BACKEND || !!getKey(); }
+
+/* ---------- District model ---------- */
+// baseVuln/riverExp/coastalExp/centerExp drive the risk formula.
+const DISTRICTS = [
+  {id:"riverside", name:"Riverside North", pop:320000, sensors:7, gauge:6.4, gaugeChg:0.8, rain:180, baseVuln:0.85, riverExp:1.0,  coastalExp:0.10, centerExp:0.15},
+  {id:"oldquarter",name:"Old Quarter",     pop:260000, sensors:5, gauge:4.8, gaugeChg:0.4, rain:120, baseVuln:0.50, riverExp:0.60, coastalExp:0.10, centerExp:0.60},
+  {id:"harbor",    name:"Harbor East",     pop:300000, sensors:6, gauge:2.1, gaugeChg:0.3, rain:70,  baseVuln:0.45, riverExp:0.40, coastalExp:1.00, centerExp:0.30},
+  {id:"kampung",   name:"Kampung Baru",    pop:285000, sensors:6, gauge:5.9, gaugeChg:0.7, rain:165, baseVuln:0.80, riverExp:0.90, coastalExp:0.20, centerExp:0.10},
+  {id:"cbd",       name:"Central Business District", pop:210000, sensors:4, gauge:3.2, gaugeChg:0.2, rain:60, baseVuln:0.35, riverExp:0.30, coastalExp:0.25, centerExp:1.00},
+  {id:"hillside",  name:"Hillside West",   pop:240000, sensors:4, gauge:1.8, gaugeChg:0.1, rain:40,  baseVuln:0.20, riverExp:0.05, coastalExp:0.02, centerExp:0.15},
+  {id:"eastgate",  name:"Eastgate",        pop:360000, sensors:5, gauge:2.9, gaugeChg:0.2, rain:55,  baseVuln:0.30, riverExp:0.20, coastalExp:0.35, centerExp:0.30},
+  {id:"southbank", name:"Southbank",       pop:315000, sensors:5, gauge:4.5, gaugeChg:0.5, rain:110, baseVuln:0.55, riverExp:0.55, coastalExp:0.55, centerExp:0.50}
+];
+
+const TRACKS = [
+  {id:"riverine", label:"Riverine — down the valley", sub:"Storm follows the river corridor (current NWS track)"},
+  {id:"center",   label:"Direct hit — city center",   sub:"Eyewall over CBD / Old Quarter"},
+  {id:"coastal",  label:"Coastal surge — Harbor East", sub:"Track hugs the coast, storm surge risk"},
+  {id:"offshore", label:"Weakening — offshore",       sub:"Storm veers out to sea, intensity drops"}
+];
+
+/* Risk formula — reproduces the brief's baseline at rain=180, track=riverine */
+function riskScore(d, rain, track){
+  // quadratic in rainfall, normalized so rain=180 reproduces the baseline exactly
+  let s = d.baseVuln*25 + (rain/300)*(rain/300)*63.333*d.riverExp;
+  if(track==="riverine") s += d.riverExp*8;
+  else if(track==="center") s += d.baseVuln*10 + d.centerExp*10;
+  else if(track==="coastal") s += d.coastalExp*18 + (rain/300)*8*d.coastalExp;
+  else if(track==="offshore") s = Math.max(0, s-12);
+  return s;
+}
+function scoreToRisk(s){
+  if(s>=60) return "SEVERE";
+  if(s>=40) return "HIGH";
+  if(s>=25) return "MODERATE";
+  return "LOW";
+}
+function districtRisk(d, rain, track){ return scoreToRisk(riskScore(d, rain, track)); }
+
+/* ---------- SVG district map polygons ---------- */
+const MAP_POLY = {
+  riverside:  "40,42 288,42 302,176 62,196",
+  hillside:   "288,42 520,42 542,164 302,176",
+  eastgate:   "520,42 772,42 772,206 560,214 542,164",
+  oldquarter: "62,196 302,176 322,344 82,362",
+  cbd:        "302,176 542,164 560,214 560,344 322,344",
+  harbor:     "560,214 772,206 772,472 570,482 560,344",
+  kampung:    "82,362 322,344 342,492 100,502",
+  southbank:  "322,344 560,344 570,482 342,492"
+};
+const MAP_LABELS = {
+  riverside:{x:150,y:118,sub:"320k"}, hillside:{x:405,y:112,sub:"240k"},
+  eastgate:{x:648,y:128,sub:"360k"}, oldquarter:{x:180,y:270,sub:"260k"},
+  cbd:{x:430,y:262,sub:"CBD · 210k"}, harbor:{x:660,y:350,sub:"300k"},
+  kampung:{x:200,y:428,sub:"285k"}, southbank:{x:440,y:420,sub:"315k"}
+};
+const RIVER_PATH = "M148,20 C176,110 82,178 150,262 C210,336 300,392 372,540";
+
+function fmtNum(n){ return n.toLocaleString("en-US"); }
+function fmtCompact(n){
+  if(n>=1e6) return (n/1e6).toFixed(2).replace(/\.?0+$/,"")+"M";
+  if(n>=1e3) return (n/1e3).toFixed(n>=1e5?0:1).replace(/\.0$/,"")+"K";
+  return ""+n;
+}
+
+/* ============================================================
+   MAP RENDERING
+   ============================================================ */
+let __mapSeq=0;
+function buildMap(rain, track, tooltipEl){
+  const uid = "m"+(++__mapSeq);
+  const gradId = "riverGrad_"+uid, shadowId = "mapShadow_"+uid;
+  let html = `<svg class="map-svg" viewBox="0 0 812 512" role="img" aria-label="Delta City district risk map">
+    <defs>
+      <linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#38bdf8" stop-opacity="0.55"/>
+        <stop offset="1" stop-color="#0ea5e9" stop-opacity="0.35"/>
+      </linearGradient>
+      <filter id="${shadowId}" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#000" flood-opacity="0.4"/>
+      </filter>
+    </defs>
+    <rect x="0" y="0" width="812" height="512" fill="#0a1322" rx="10"/>`;
+  // coastline hint on right/bottom
+  html += `<path d="M772,206 L800,206 L800,482 L570,482" fill="none" stroke="rgba(56,189,248,0.18)" stroke-width="2" stroke-dasharray="3 5"/>`;
+  DISTRICTS.forEach(d=>{
+    const risk = districtRisk(d, rain, track);
+    const c = RISK[risk].color;
+    html += `<polygon class="district" data-id="${d.id}" points="${MAP_POLY[d.id]}"
+      fill="${c}" fill-opacity="0.72" stroke="#0a1322" stroke-width="2.5" filter="url(#${shadowId})"/>`;
+  });
+  // river on top
+  html += `<path d="${RIVER_PATH}" fill="none" stroke="url(#${gradId})" stroke-width="16" stroke-linecap="round"/>`;
+  html += `<path d="${RIVER_PATH}" fill="none" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round" opacity="0.5"/>`;
+  // labels
+  DISTRICTS.forEach(d=>{
+    const L=MAP_LABELS[d.id];
+    html += `<text class="district-label" x="${L.x}" y="${L.y}" text-anchor="middle">${d.name.replace("Central Business District","CBD")}</text>`;
+    html += `<text class="district-sub" x="${L.x}" y="${L.y+15}" text-anchor="middle">${L.sub}</text>`;
+  });
+  html += `</svg>`;
+  const mount = document.createElement("div");
+  mount.innerHTML = html;
+  const svg = mount.firstElementChild;
+  // interactions
+  svg.querySelectorAll(".district").forEach(poly=>{
+    const d = DISTRICTS.find(x=>x.id===poly.dataset.id);
+    poly.addEventListener("mousemove", e=>{
+      const risk = districtRisk(d, rain, track);
+      const c = RISK[risk].color;
+      tooltipEl.innerHTML =
+        `<div class="mt-name">${d.name}</div>
+         <div class="mt-risk" style="background:${c}22;color:${c}">${risk} RISK</div>
+         <div class="mt-row"><span>Population</span><b>${fmtNum(d.pop)}</b></div>
+         <div class="mt-row"><span>River gauge</span><b>${d.gauge.toFixed(1)} m ▲${d.gaugeChg}</b></div>
+         <div class="mt-row"><span>Rain forecast 48h</span><b>${d.rain} mm</b></div>
+         <div class="mt-row"><span>Active sensors</span><b>${d.sensors}</b></div>`;
+      const wrap = tooltipEl.parentElement.getBoundingClientRect();
+      let x = e.clientX - wrap.left + 14;
+      let y = e.clientY - wrap.top + 14;
+      if(x > wrap.width-210) x = e.clientX - wrap.left - 204;
+      tooltipEl.style.left = x+"px";
+      tooltipEl.style.top = y+"px";
+      tooltipEl.classList.add("show");
+    });
+    poly.addEventListener("mouseleave", ()=> tooltipEl.classList.remove("show"));
+  });
+  return svg;
+}
+function buildLegend(){
+  return Object.values(RISK).map(r=>
+    `<div class="leg-item"><span class="leg-sw" style="background:${r.color}"></span>${r.label}</div>`
+  ).join("") + `<div class="leg-item" style="margin-left:auto"><span class="leg-sw" style="background:linear-gradient(90deg,#38bdf8,#0ea5e9)"></span>River / coastline</div>`;
+}
+
+/* ============================================================
+   FORECAST CHART (river level + rainfall, shared 72h x-axis)
+   ============================================================ */
+function genForecast(){
+  const hrs=[], mean=[], lo=[], hi=[], rain=[];
+  for(let h=0; h<=72; h+=3){
+    const m = 4.1 + 2.75*Math.exp(-Math.pow((h-42)/19,2));
+    const cw = 0.10 + 0.011*h;
+    hrs.push(h); mean.push(m); lo.push(m-cw); hi.push(m+cw);
+    rain.push(1.5 + 25*Math.exp(-Math.pow((h-36)/15,2)));
+  }
+  return {hrs, mean, lo, hi, rain};
+}
+function buildForecast(){
+  const f = genForecast();
+  const W=560;
+  // ---- River chart ----
+  const rH=214, mL=46, mR=58, mT=16, mB=30;
+  const iw=W-mL-mR, ih=rH-mT-mB;
+  const xmax=72, ymin=3.5, ymax=7.5;
+  const X = h => mL + (h/xmax)*iw;
+  const Y = v => mT + (1-(v-ymin)/(ymax-ymin))*ih;
+  const flood=5.5, danger=6.5;
+  let band = "M"+f.hrs.map((h,i)=>`${X(h)},${Y(f.hi[i])}`).join(" L");
+  band += " L"+f.hrs.map((h,i)=>`${X(h)},${Y(f.lo[i])}`).reverse().join(" L")+" Z";
+  const meanPath = "M"+f.hrs.map((h,i)=>`${X(h)},${Y(f.mean[i])}`).join(" L");
+  let riverSvg = `<svg class="chart-svg" viewBox="0 0 ${W} ${rH}" role="img" aria-label="72-hour river level forecast">`;
+  for(let v=4;v<=7;v++){ riverSvg+=`<line class="grid-line" x1="${mL}" y1="${Y(v)}" x2="${W-mR}" y2="${Y(v)}"/>
+    <text class="axis-label" x="${mL-8}" y="${Y(v)+3.5}" text-anchor="end">${v}.0</text>`;}
+  // thresholds
+  riverSvg += `<line x1="${mL}" y1="${Y(flood)}" x2="${W-mR}" y2="${Y(flood)}" stroke="${RISK.MODERATE.color}" stroke-width="1.3" stroke-dasharray="5 4" opacity="0.85"/>
+    <text class="axis-label" x="${W-mR+4}" y="${Y(flood)+3.5}" fill="${RISK.MODERATE.color}">Flood 5.5m</text>`;
+  riverSvg += `<line x1="${mL}" y1="${Y(danger)}" x2="${W-mR}" y2="${Y(danger)}" stroke="${RISK.SEVERE.color}" stroke-width="1.3" stroke-dasharray="5 4" opacity="0.85"/>
+    <text class="axis-label" x="${W-mR+4}" y="${Y(danger)+3.5}" fill="${RISK.SEVERE.color}">Danger 6.5m</text>`;
+  riverSvg += `<path d="${band}" fill="${ACCENT}" fill-opacity="0.14"/>`;
+  riverSvg += `<path d="${meanPath}" fill="none" stroke="${ACCENT}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  // peak marker
+  const pk = f.mean.indexOf(Math.max(...f.mean));
+  riverSvg += `<circle cx="${X(f.hrs[pk])}" cy="${Y(f.mean[pk])}" r="4.5" fill="${ACCENT}" stroke="#0d1526" stroke-width="2"/>`;
+  riverSvg += `<text class="axis-label" x="${X(f.hrs[pk])}" y="${Y(f.mean[pk])-9}" text-anchor="middle" fill="#fff" font-weight="600">peak ${f.mean[pk].toFixed(1)}m · T+${f.hrs[pk]}h</text>`;
+  // x ticks
+  [0,12,24,36,48,60,72].forEach(h=>{
+    riverSvg+=`<text class="axis-label" x="${X(h)}" y="${rH-10}" text-anchor="middle">${h===0?'now':'+'+h+'h'}</text>`;});
+  riverSvg += `<line class="axis-line" x1="${mL}" y1="${mT+ih}" x2="${W-mR}" y2="${mT+ih}"/>`;
+  riverSvg += `<text class="axis-title" x="${mL-38}" y="${mT-4}" >River level (m)</text>`;
+  riverSvg += `</svg>`;
+
+  // ---- Rainfall chart ----
+  const rH2=132, mB2=26;
+  const ih2 = rH2-mT-mB2;
+  const rmax=30;
+  const Y2 = v => mT + (1-v/rmax)*ih2;
+  const bw = Math.max(5, iw/f.hrs.length - 3);
+  let rainSvg = `<svg class="chart-svg" viewBox="0 0 ${W} ${rH2}" role="img" aria-label="72-hour rainfall forecast">`;
+  [0,10,20,30].forEach(v=>{ rainSvg+=`<line class="grid-line" x1="${mL}" y1="${Y2(v)}" x2="${W-mR}" y2="${Y2(v)}"/>
+    <text class="axis-label" x="${mL-8}" y="${Y2(v)+3.5}" text-anchor="end">${v}</text>`;});
+  f.hrs.forEach((h,i)=>{
+    const bh = (mT+ih2)-Y2(f.rain[i]);
+    rainSvg += `<rect x="${X(h)-bw/2}" y="${Y2(f.rain[i])}" width="${bw}" height="${Math.max(0,bh)}" rx="2" fill="${ACCENT2}" opacity="0.85"/>`;
+  });
+  [0,12,24,36,48,60,72].forEach(h=>{
+    rainSvg+=`<text class="axis-label" x="${X(h)}" y="${rH2-8}" text-anchor="middle">${h===0?'now':'+'+h+'h'}</text>`;});
+  rainSvg += `<line class="axis-line" x1="${mL}" y1="${mT+ih2}" x2="${W-mR}" y2="${mT+ih2}"/>`;
+  rainSvg += `<text class="axis-title" x="${mL-38}" y="${mT-4}">Rainfall (mm/hr)</text>`;
+  rainSvg += `</svg>`;
+
+  return `<div class="chart-title">River level — Riverside North gauge</div>
+    <div class="chart-sub">Mean forecast with 90% confidence band · flood stage 5.5m, danger 6.5m</div>
+    ${riverSvg}
+    <div class="chart-legend">
+      <div class="cl-item"><span class="cl-key" style="background:${ACCENT}"></span>Mean forecast</div>
+      <div class="cl-item"><span class="cl-key band" style="background:${ACCENT}33"></span>90% confidence</div>
+      <div class="cl-item"><span class="cl-key" style="background:${RISK.MODERATE.color}"></span>Flood stage</div>
+      <div class="cl-item"><span class="cl-key" style="background:${RISK.SEVERE.color}"></span>Danger level</div>
+    </div>
+    <div style="height:14px"></div>
+    <div class="chart-title">Rainfall forecast</div>
+    <div class="chart-sub">National weather service · 180 mm total projected over 48h</div>
+    ${rainSvg}`;
+}
+
+/* ============================================================
+   KPI TILES
+   ============================================================ */
+function buildKPIs(){
+  const atRisk = DISTRICTS.filter(d=>{const r=districtRisk(d,180,"riverine");return r==="HIGH"||r==="MODERATE"||r==="SEVERE";}).reduce((a,d)=>a+d.pop,0);
+  const tiles = [
+    {cls:"k-accent-high", label:"Population at risk", val:fmtCompact(atRisk), unit:"", icon:iconUsers("#f97316"),
+      delta:`<span class="up">▲ +180k</span> vs 24h ago · in HIGH/MODERATE zones`, track:null},
+    {cls:"k-accent-mod", label:"Active alerts", val:"7", unit:"", icon:iconBell("#eab308"),
+      delta:`<span class="up">▲ 3 new</span> · 2 HIGH · 5 MODERATE`, track:null},
+    {cls:"k-accent-low", label:"Sensors online", val:"40", unit:"/ 42", icon:iconActivity("#22c55e"),
+      delta:`95% uptime · 2 gauges offline in Eastgate`, track:{pct:95,color:"#22c55e"}},
+    {cls:"k-accent-accent", label:"Shelter capacity", val:"18,400", unit:"open", icon:iconHome("#38bdf8"),
+      delta:`12 shelters active · 61% of 30,000 free`, track:{pct:39,color:"#38bdf8"}}
+  ];
+  return tiles.map(t=>`
+    <div class="kpi ${t.cls}">
+      <div class="k-top">
+        <span class="k-label">${t.label}</span>
+        <span class="k-icon">${t.icon}</span>
+      </div>
+      <div class="k-val">${t.val}${t.unit?`<span class="unit">${t.unit}</span>`:""}</div>
+      <div class="k-delta">${t.delta}</div>
+      ${t.track?`<div class="mini-track"><span style="width:${t.track.pct}%;background:${t.track.color}"></span></div>`:""}
+    </div>`).join("");
+}
+function iconUsers(c){return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;}
+function iconBell(c){return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`;}
+function iconActivity(c){return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`;}
+function iconHome(c){return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>`;}
+
+/* ============================================================
+   SENSOR TICKER
+   ============================================================ */
+const SENSOR_POOL = [
+  {id:"RVN-07", name:"Riverside North · main gauge", base:6.4, unit:"m", type:"river"},
+  {id:"KPB-04", name:"Kampung Baru · embankment", base:5.9, unit:"m", type:"river"},
+  {id:"SBK-02", name:"Southbank · canal", base:4.5, unit:"m", type:"river"},
+  {id:"OLQ-03", name:"Old Quarter · storm drain", base:4.8, unit:"m", type:"river"},
+  {id:"RVN-11", name:"Riverside North · rain gauge", base:24, unit:"mm/h", type:"rain"},
+  {id:"HBE-06", name:"Harbor East · tide", base:2.1, unit:"m", type:"tide"},
+  {id:"CBD-01", name:"CBD · underpass sensor", base:3.2, unit:"m", type:"river"},
+  {id:"KPB-09", name:"Kampung Baru · rain gauge", base:22, unit:"mm/h", type:"rain"},
+  {id:"EGT-05", name:"Eastgate · culvert", base:2.9, unit:"m", type:"river"},
+  {id:"HLW-02", name:"Hillside West · runoff", base:1.8, unit:"m", type:"river"}
+];
+function tickerRow(s){
+  const jitter = (Math.random()-0.4)*(s.type==="rain"?3:0.15);
+  const val = (s.base + jitter);
+  const rising = jitter>0.02;
+  const flat = Math.abs(jitter)<=0.05;
+  const trendCls = flat?"trend-flat":(rising?"trend-up":"trend-down");
+  const arrow = flat?"→":(rising?"▲":"▼");
+  let status, sc;
+  if(s.type==="river" && val>5.5){status="ALERT";sc="background:rgba(239,68,68,0.15);color:#f39898";}
+  else if(s.type==="river" && val>4.5){status="WATCH";sc="background:rgba(249,115,22,0.14);color:#f9b48a";}
+  else if(s.type==="rain" && val>20){status="HEAVY";sc="background:rgba(234,179,8,0.14);color:#f0cf5e";}
+  else {status="NOMINAL";sc="background:rgba(34,197,94,0.12);color:#7fe6a5";}
+  return `<div class="ticker-row">
+    <span class="sensor-id">${s.id}</span>
+    <span class="sensor-name">${s.name}</span>
+    <span class="sensor-val">${val.toFixed(s.type==="rain"?0:2)} ${s.unit}</span>
+    <span class="sensor-val ${trendCls}">${arrow} ${Math.abs(jitter).toFixed(s.type==="rain"?1:2)}</span>
+    <span class="chip-status" style="${sc}">${status}</span>
+  </div>`;
+}
+function buildTicker(){
+  return `<div class="ticker-list" id="tickerList">${SENSOR_POOL.map(tickerRow).join("")}</div>`;
+}
+let tickerTimer=null;
+function startTicker(){
+  if(SHOT||tickerTimer) return;
+  tickerTimer = setInterval(()=>{
+    const list = document.getElementById("tickerList");
+    if(!list) return;
+    const s = SENSOR_POOL[Math.floor(Math.random()*SENSOR_POOL.length)];
+    const row = document.createElement("div");
+    row.innerHTML = tickerRow(s);
+    const el = row.firstElementChild;
+    el.style.background="rgba(56,189,248,0.08)";
+    list.insertBefore(el, list.firstChild);
+    setTimeout(()=>{ el.style.transition="background .8s"; el.style.background=""; },50);
+    while(list.children.length>10) list.removeChild(list.lastChild);
+  }, 2200);
+}
+
+/* ============================================================
+   CITIZEN REPORTS
+   ============================================================ */
+function thumb(kind){
+  // inline SVG placeholder thumbnails (no real photos)
+  const bases = {
+    flood:`<rect width="96" height="96" fill="#0e2036"/><path d="M0 62 Q24 54 48 62 T96 62 V96 H0Z" fill="#1e5a8a" opacity="0.85"/><path d="M0 72 Q24 66 48 72 T96 72 V96 H0Z" fill="#2b7cb8" opacity="0.7"/><rect x="20" y="30" width="16" height="34" fill="#3a4a5e"/><rect x="58" y="24" width="18" height="40" fill="#46586e"/><circle cx="70" cy="20" r="8" fill="#eab308" opacity="0.6"/>`,
+    drain:`<rect width="96" height="96" fill="#241d12"/><rect x="0" y="60" width="96" height="36" fill="#3a3226"/><ellipse cx="48" cy="60" rx="26" ry="10" fill="#12100a"/><path d="M30 60 h36 M34 55 h28 M38 65 h20" stroke="#5a4e38" stroke-width="2"/><path d="M20 40 q10 -14 24 -6" stroke="#6b5b3e" stroke-width="3" fill="none"/>`,
+    landslide:`<rect width="96" height="96" fill="#1a1410"/><path d="M0 40 L40 20 L96 44 V96 H0Z" fill="#5a3d28"/><path d="M0 60 L34 40 L96 66 V96 H0Z" fill="#3e2a1c"/><path d="M20 50 l8 12 M40 44 l6 14 M64 52 l6 12" stroke="#2a1c12" stroke-width="2"/><rect x="60" y="30" width="12" height="16" fill="#4a5a3e" opacity="0.7"/>`,
+    debris:`<rect width="96" height="96" fill="#0e2233"/><path d="M0 66 Q24 58 48 66 T96 66 V96 H0Z" fill="#1e5a7a"/><rect x="18" y="52" width="24" height="8" fill="#6b5b3e" transform="rotate(-12 30 56)"/><rect x="50" y="58" width="30" height="7" fill="#7a6a48" transform="rotate(8 65 61)"/><circle cx="40" cy="60" r="5" fill="#8a7a58"/>`
+  };
+  return `<svg viewBox="0 0 96 96">${bases[kind]||bases.flood}</svg>`;
+}
+const REPORTS = [
+  {id:"CR-4821", district:"Riverside North", time:"2 min ago", kind:"flood", severity:"SEVERE",
+   type:"Flooding", conf:96, dup:0, text:"Water up to waist level on Jalan Sungai, cars stranded. Elderly residents on 2nd floor need help.", verified:null},
+  {id:"CR-4820", district:"Kampung Baru", time:"4 min ago", kind:"flood", severity:"HIGH",
+   type:"Flooding", conf:93, dup:0, text:"Embankment overflowing near the market, water entering ground-floor homes rapidly.", verified:null},
+  {id:"CR-4818", district:"Kampung Baru", time:"6 min ago", kind:"flood", severity:"HIGH",
+   type:"Flooding", conf:90, dup:2, text:"Market area flooding, same as reported by others. Stalls underwater.", verified:null},
+  {id:"CR-4817", district:"Old Quarter", time:"9 min ago", kind:"drain", severity:"MODERATE",
+   type:"Blocked drain", conf:88, dup:0, text:"Storm drain on Heritage Lane completely blocked with debris, water pooling fast.", verified:null},
+  {id:"CR-4815", district:"Hillside West", time:"12 min ago", kind:"landslide", severity:"HIGH",
+   type:"Landslide risk", conf:85, dup:0, text:"Soil slipping on the slope behind the school after heavy rain, cracks visible in retaining wall.", verified:null},
+  {id:"CR-4814", district:"Southbank", time:"15 min ago", kind:"flood", severity:"MODERATE",
+   type:"Flooding", conf:82, dup:0, text:"Canal level rising, footpath along the river now underwater near the pedestrian bridge.", verified:null},
+  {id:"CR-4812", district:"Riverside North", time:"18 min ago", kind:"debris", severity:"MODERATE",
+   type:"Debris flow", conf:79, dup:0, text:"Fallen tree and debris blocking the drainage channel on Riverbank Road.", verified:null},
+  {id:"CR-4810", district:"Riverside North", time:"21 min ago", kind:"flood", severity:"SEVERE",
+   type:"Flooding", conf:94, dup:2, text:"Jalan Sungai fully submerged, matches earlier reports. Rescue boats needed.", verified:null},
+  {id:"CR-4808", district:"Harbor East", time:"26 min ago", kind:"flood", severity:"LOW",
+   type:"Coastal flooding", conf:71, dup:0, text:"Minor tidal flooding at the quay, water over the lower dock but manageable.", verified:null},
+  {id:"CR-4805", district:"Eastgate", time:"31 min ago", kind:"drain", severity:"LOW",
+   type:"Blocked drain", conf:64, dup:0, text:"Possible spam / unclear photo — flagged for review. Text mentions a clogged gutter.", verified:null}
+];
+function buildReports(){
+  return REPORTS.map(r=>{
+    const c = RISK[r.severity].color;
+    return `<div class="report-card" data-id="${r.id}">
+      <div class="rc-top">
+        <div class="rc-thumb">${thumb(r.kind)}</div>
+        <div class="rc-main">
+          <div class="rc-head"><span class="rc-id">${r.id}</span><span class="rc-time">${r.time}</span></div>
+          <div class="rc-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${r.district}</div>
+          <div class="rc-text">${r.text}</div>
+        </div>
+      </div>
+      <div class="rc-badges">
+        <span class="badge" style="background:${c}1a;color:${c};border-color:${c}4d">${r.severity}</span>
+        <span class="badge badge-type">${r.type}</span>
+        ${r.dup?`<span class="badge badge-dup"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>${r.dup} duplicate${r.dup>1?'s':''}</span>`:``}
+        <span class="badge badge-ai"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.4 2.3 7.2L12 16.5 5.7 20.8 8 13.6 2 9.2h7.6z"/></svg>Gemini ${r.conf}%</span>
+        <span class="conf-mini" style="margin-left:auto">conf <span class="conf-bar"><span style="width:${r.conf}%"></span></span></span>
+      </div>
+      <div class="rc-actions">
+        <button class="rc-btn verify"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>Verify</button>
+        <button class="rc-btn dismiss"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg>Dismiss</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+/* ============================================================
+   RANKED ACTIONS
+   ============================================================ */
+const ACTIONS = [
+  {rank:1, risk:"SEVERE", cat:"Evacuation", title:"Evacuate Riverside North floodplain now",
+   reason:"River gauge at 6.4m, 0.1m below the 6.5m danger mark and rising ~0.08m/hr. Vertex AI projects breach of danger level in T+6–9h. Highest population-weighted risk in the city.",
+   pop:"131,000", conf:94,
+   detail:["<b>Trigger:</b> Gauge RVN-07 crossed 6.3m at 08:12; forecast 90% CI upper bound exceeds 7.0m by T+12h.","<b>SOP match:</b> Flood Response Playbook §4.2 — mandatory evacuation when gauge within 0.2m of danger with rising trend.","<b>Routes:</b> 3 primary egress roads clear; Riverbank Rd partially blocked (see report CR-4812).","<b>Shelters:</b> 3 activated within 3km, 7,500 capacity, 62% free."]},
+  {rank:2, risk:"HIGH", cat:"Evacuation", title:"Stage evacuation for Kampung Baru embankment zone",
+   reason:"Gauge at 5.9m and rising; informal housing along the embankment raises structural vulnerability. Citizen reports confirm ground-floor flooding (CR-4820, CR-4818).",
+   pop:"117,000", conf:89,
+   detail:["<b>Trigger:</b> Gauge KPB-04 above 5.5m flood stage for 40+ min; 2 corroborating citizen reports.","<b>SOP match:</b> Playbook §4.1 — pre-position transport, issue voluntary evacuation, prepare mandatory order.","<b>Vulnerability:</b> High density informal settlement; Comms Agent advisory drafted in EN + BM."]},
+  {rank:3, risk:"HIGH", cat:"Pump deployment", title:"Deploy mobile pumps to Old Quarter drainage network",
+   reason:"Blocked storm drains (CR-4817) + 120mm forecast will overwhelm gravity drainage. Pre-emptive pumping keeps the heritage core below flood stage.",
+   pop:"48,000", conf:82,
+   detail:["<b>Assets:</b> 4 high-capacity mobile pumps available at Central depot, ETA 25 min.","<b>Impact model:</b> Reduces projected Old Quarter peak by ~0.4m, keeping it below 5.5m flood stage.","<b>Dependency:</b> Clear debris at Heritage Lane drain first (dispatch crew with pumps)."]},
+  {rank:4, risk:"MODERATE", cat:"Road closure", title:"Close CBD underpass and Riverbank Road",
+   reason:"Underpass sensor CBD-01 trending toward 3.5m; historically floods at 3.8m. Riverbank Rd already debris-blocked. Prevents vehicle entrapment.",
+   pop:"22,000", conf:88,
+   detail:["<b>Trigger:</b> Underpass water depth + inbound rainfall band arriving T+2h.","<b>SOP match:</b> Traffic Safety §2.3 — proactive closure at 80% of historic flood depth.","<b>Coordination:</b> Notify traffic control + push citizen app alert with detour."]},
+  {rank:5, risk:"MODERATE", cat:"Shelter activation", title:"Activate 2 reserve shelters in Hillside West",
+   reason:"Hillside West is LOW risk and on high ground — ideal overflow capacity. Adds 4,500 spaces as a buffer for HIGH-risk evacuees.",
+   pop:"—", conf:85,
+   detail:["<b>Rationale:</b> Total HIGH-risk floodplain population ~248,000; est. shelter demand ~14,000 vs 18,400 open — activate reserves for margin.","<b>Site check:</b> Both reserve sites (community hall + sports complex) pass access + capacity checks."]},
+  {rank:6, risk:"MODERATE", cat:"Public advisory", title:"Issue multilingual public advisory (EN + Bahasa)",
+   reason:"Comms Agent has a tone-checked draft ready for Riverside North & Kampung Baru. Human confirmation required before broadcast via SMS/push.",
+   pop:"605,000", conf:91,
+   detail:["<b>Channels:</b> SMS + citizen-app push via Pub/Sub fan-out; est. reach 605,000.","<b>Languages:</b> English + Bahasa Indonesia/Melayu, tone-checked for clarity and calm.","<b>Responsible AI:</b> Human-in-the-loop confirmation gate before any public broadcast."]}
+];
+function buildActions(){
+  return ACTIONS.map((a,i)=>{
+    const c = RISK[a.risk].color;
+    return `<div class="action-card">
+      <div class="ac-main">
+        <div class="ac-rank" style="background:${c}">${a.rank}</div>
+        <div class="ac-body">
+          <div class="ac-title-row">
+            <h3 class="ac-title">${a.title}</h3>
+            <span class="ac-cat">${a.cat}</span>
+          </div>
+          <p class="ac-reason">${a.reason}</p>
+          <div class="ac-metrics">
+            <div class="ac-metric"><span class="m-label">Priority risk</span><span class="m-val" style="color:${c}">${a.risk}</span></div>
+            <div class="ac-metric"><span class="m-label">Population impact</span><span class="m-val">${a.pop}</span></div>
+            <div class="ac-metric"><span class="m-label">Model confidence</span>
+              <span class="conf-wrap"><span class="conf-bar2"><span style="width:${a.conf}%;background:${a.conf>=88?'#22c55e':a.conf>=80?'#eab308':'#f97316'}"></span></span><b class="m-val" style="font-size:13px">${a.conf}%</b></span>
+            </div>
+          </div>
+          <button class="ac-explain-btn" data-idx="${i}">Explain reasoning <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+        </div>
+      </div>
+      <div class="ac-explain" data-explain="${i}">
+        <div class="ac-explain-inner">
+          <h4>Why this action, why now</h4>
+          <ul>${a.detail.map(d=>`<li>${d}</li>`).join("")}</ul>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+/* ============================================================
+   COPILOT (demo Q&A + live Gemini)
+   ============================================================ */
+function riskTag(r){return `<span class="risk-inline" style="background:${RISK[r].color}22;color:${RISK[r].color}">${r}</span>`;}
+const DEMO_QA = [
+  {q:"Which districts should we evacuate first and why?",
+   a:`<p>Based on live gauge data and the Vertex AI 72-hour forecast, I recommend evacuating in this order:</p>
+   <ol>
+   <li><strong>Riverside North</strong> ${riskTag("SEVERE")} — river gauge at <strong>6.4m</strong>, just 0.1m below the 6.5m danger mark and rising ~0.08m/hr. 180mm rain forecast over 48h. ~<strong>131,000</strong> residents in the floodplain. <strong>Begin now.</strong></li>
+   <li><strong>Kampung Baru</strong> ${riskTag("HIGH")} — gauge at 5.9m and rising; dense informal housing along the embankment raises vulnerability. Two citizen reports already confirm ground-floor flooding. ~117,000 residents.</li>
+   <li><strong>Old Quarter &amp; Southbank</strong> ${riskTag("MODERATE")} — stage residents and pre-position transport; gauges projected to cross the 5.5m flood stage around T+30h.</li>
+   </ol>
+   <p>Shelters within 3km currently have <strong>18,400 open spaces</strong> — sufficient for the HIGH-risk cohort. I can draft the evacuation advisory on your confirmation.</p>
+   <div class="cite-row"><span class="cite">Gauge network · 40/42 online</span><span class="cite">Vertex AI 72h forecast</span><span class="cite">Population density registry</span></div>`},
+
+  {q:"What's our shelter capacity right now?",
+   a:`<p>Delta City has <strong>12 activated shelters</strong> with a combined capacity of <strong>30,000</strong>. Current occupancy is 11,600 (39%), leaving <strong>18,400 open spaces</strong>.</p>
+   <ul>
+   <li><strong>Riverside North zone:</strong> 3 shelters · 7,500 capacity · 62% free</li>
+   <li><strong>Kampung Baru zone:</strong> 2 shelters · 5,000 capacity · 55% free</li>
+   <li><strong>Central zone:</strong> 4 shelters · 10,500 capacity · 71% free</li>
+   <li><strong>Other:</strong> 3 shelters · 7,000 capacity · 68% free</li>
+   </ul>
+   <p>If both HIGH-risk districts fully evacuate their floodplain populations (~248,000, of which ~14,000 are projected to need shelter), demand stays within capacity. I recommend <strong>activating 2 reserve shelters in Hillside West</strong> (LOW risk, high ground) as a buffer.</p>
+   <div class="cite-row"><span class="cite">Shelter capacity registry</span><span class="cite">Population density registry</span></div>`},
+
+  {q:"Draft a public advisory for Riverside North (English + Bahasa).",
+   a:`<p>Here is a tone-checked draft advisory. <strong>Human confirmation is required before broadcast.</strong></p>
+   <div class="advisory">
+     <div class="adv-lang en"><div class="adv-flag">🇬🇧 English</div>
+       <div class="adv-body"><strong>FLOOD EVACUATION — RIVERSIDE NORTH.</strong> The river is near danger level and still rising. If you live near the riverbank, please move to higher ground now. Go to the nearest relief shelter: Riverside Community Hall or Northgate Sports Complex. Bring essential medicines and documents. Help elderly neighbours. Do not walk or drive through floodwater. Stay calm — help is on the way. Updates: ResilienceAlert app.</div>
+     </div>
+     <div class="adv-lang id"><div class="adv-flag">🇮🇩 Bahasa Indonesia / Melayu</div>
+       <div class="adv-body"><strong>EVAKUASI BANJIR — RIVERSIDE NORTH.</strong> Paras sungai hampir mencapai tahap bahaya dan masih meningkat. Jika anda tinggal berhampiran tebing sungai, sila berpindah ke kawasan tinggi sekarang. Pergi ke pusat pemindahan terdekat: Dewan Komuniti Riverside atau Kompleks Sukan Northgate. Bawa ubat-ubatan penting dan dokumen. Bantu jiran warga emas. Jangan berjalan atau memandu melalui air banjir. Bertenang — bantuan sedang menuju. Kemas kini: aplikasi ResilienceAlert.</div>
+     </div>
+   </div>
+   <p style="margin-top:10px">Tone check: <strong>clear, calm, actionable</strong> · reading level ~grade 6 · est. reach 605,000 via SMS + push.</p>
+   <div class="cite-row"><span class="cite">Comms Agent · Gemini 2.5</span><span class="cite">Shelter registry</span><span class="cite">Human-in-the-loop gate</span></div>`},
+
+  {q:"Why is Kampung Baru high risk?",
+   a:`<p><strong>Kampung Baru</strong> is rated ${riskTag("HIGH")} for four converging reasons:</p>
+   <ul>
+   <li><strong>Rising river gauge:</strong> KPB-04 reads 5.9m — above the 5.5m flood stage and climbing ~0.7m over 24h.</li>
+   <li><strong>Heavy rainfall:</strong> 165mm forecast over the next 48h drains directly into the embankment catchment.</li>
+   <li><strong>High exposure &amp; vulnerability:</strong> dense, low-lying informal settlement along the embankment; limited natural drainage.</li>
+   <li><strong>Ground-truth confirmation:</strong> 2 citizen reports (CR-4820, CR-4818) verify ground-floor flooding at the market — the model's prediction matches reality.</li>
+   </ul>
+   <p>Combined risk index places it just behind Riverside North. Recommended action: <strong>stage evacuation</strong> and pre-position transport.</p>
+   <div class="cite-row"><span class="cite">Gauge KPB-04</span><span class="cite">Vertex AI forecast</span><span class="cite">Citizen reports</span><span class="cite">BigQuery hydrology history</span></div>`},
+
+  {q:"How should we allocate pumps and response crews?",
+   a:`<p>Given current risk and asset locations, here's the recommended allocation:</p>
+   <ul>
+   <li><strong>Old Quarter</strong> — dispatch <strong>4 mobile pumps</strong> + 1 debris crew to Heritage Lane. Pre-emptive pumping keeps the heritage core below flood stage (cuts projected peak ~0.4m).</li>
+   <li><strong>Riverside North</strong> — assign <strong>2 rescue-boat teams</strong> and 3 evacuation buses; prioritise the Jalan Sungai cluster (multiple severe reports).</li>
+   <li><strong>Kampung Baru</strong> — <strong>2 rescue teams</strong> + medical unit staged at the market edge.</li>
+   <li><strong>Reserve</strong> — hold 2 pumps + 1 crew at Central depot for Southbank if its gauge crosses 5.5m (projected T+30h).</li>
+   </ul>
+   <p>This keeps 100% of HIGH-risk zones covered while retaining a mobile reserve. Estimated crews required: 11 of 14 available.</p>
+   <div class="cite-row"><span class="cite">Asset registry</span><span class="cite">Response Planner · SOP RAG</span><span class="cite">Live risk map</span></div>`},
+
+  {q:"Summarize the current situation.",
+   a:`<p><strong>Situation as of now — tropical storm approaching, monsoon season:</strong></p>
+   <ul>
+   <li><strong>2 districts HIGH risk:</strong> Riverside North (6.4m) and Kampung Baru (5.9m), both above flood stage and rising.</li>
+   <li><strong>2 districts MODERATE:</strong> Old Quarter and Southbank, projected to cross flood stage ~T+30h.</li>
+   <li><strong>Population at risk:</strong> ~1.18M in HIGH/MODERATE zones.</li>
+   <li><strong>Forecast:</strong> river peak ~6.8m at T+42h; 180mm rain over 48h. Danger level breach possible in Riverside North within 6–9h.</li>
+   <li><strong>Resources:</strong> 40/42 gauges online, 18,400 shelter spaces open, 7 active alerts.</li>
+   </ul>
+   <p>Top priority: begin Riverside North evacuation and stage Kampung Baru. 6 ranked actions are ready for your review.</p>
+   <div class="cite-row"><span class="cite">Live risk map</span><span class="cite">Vertex AI forecast</span><span class="cite">Sensor + shelter registries</span></div>`}
+];
+const FALLBACK_A = `<p>I'm running in <strong>demo mode</strong> with a curated snapshot of Delta City's current state, so I can answer from the live context I have: district risk levels, gauge readings, the 72h forecast, shelter capacity, citizen reports, and ranked actions.</p>
+<p>Try one of the suggested questions on the left — for example evacuation priority, shelter capacity, why a district is high risk, resource allocation, or drafting a bilingual advisory. To get free-form answers grounded on the same data, add a Gemini API key in <strong>Settings ⚙</strong> to switch to live mode.</p>`;
+
+function citySystemPrompt(){
+  const lines = DISTRICTS.map(d=>`- ${d.name}: risk ${districtRisk(d,180,"riverine")}, gauge ${d.gauge}m (+${d.gaugeChg}/24h), 48h rain ${d.rain}mm, pop ${d.pop}`).join("\n");
+  return `You are the AI Response Assistant for ResilienceAI, a flood decision-intelligence platform for Delta City (pop ~2.4M, monsoon season, tropical storm approaching). Answer city disaster-management operators with concise, grounded, explainable guidance. Cite the data you use. Current simulated city state:
+${lines}
+72h forecast: river peaks ~6.8m at T+42h; flood stage 5.5m, danger 6.5m. Shelters: 12 active, 30,000 capacity, 18,400 open. Sensors: 40/42 online. 7 active alerts. Population at risk (HIGH/MODERATE): ~1.18M. When asked for advisories, provide English + Bahasa Indonesia/Melayu and note human confirmation is required. Keep answers focused and operational.`;
+}
+
+const chatScroll = ()=>document.getElementById("chatScroll");
+function addMsg(role, html){
+  const el = document.createElement("div");
+  el.className = "msg "+role;
+  el.innerHTML = `<div class="ava ${role==='ai'?'ai':'user'}">${role==='ai'?'AI':'You'}</div><div class="bubble">${html}</div>`;
+  chatScroll().appendChild(el);
+  chatScroll().scrollTop = chatScroll().scrollHeight;
+  return el;
+}
+function addTyping(){
+  const el = document.createElement("div");
+  el.className="msg ai"; el.dataset.typing="1";
+  el.innerHTML = `<div class="ava ai">AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  chatScroll().appendChild(el); chatScroll().scrollTop=chatScroll().scrollHeight;
+  return el;
+}
+function getKey(){ return localStorage.getItem("resai_gemini_key")||""; }
+
+async function askCopilot(q){
+  addMsg("user", escapeHtml(q));
+  const key = getKey();
+  const typing = SHOT?null:addTyping();
+  if(BACKEND || key){
+    try{
+      const ans = BACKEND ? await callBackendChat(q) : await callGemini(key, q);
+      if(typing) typing.remove();
+      const src = BACKEND ? "ResilienceAI backend · live" : "gemini-2.5-flash · live";
+      addMsg("ai", `<p>${escapeHtml(ans).replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')}</p><div class="cite-row"><span class="cite">${src}</span><span class="cite">grounded on city state</span></div>`);
+      return;
+    }catch(err){
+      if(typing) typing.remove();
+      addMsg("ai", `<p style="color:#f0cf5e">⚠ Live call failed (${escapeHtml(String(err.message||err))}). Falling back to demo mode.</p>`+demoAnswer(q));
+      return;
+    }
+  }
+  const finish = ()=>{ if(typing) typing.remove(); addMsg("ai", demoAnswer(q)); };
+  if(SHOT) finish(); else setTimeout(finish, 650);
+}
+async function callBackendChat(q){
+  const res = await fetch("/api/chat", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({question:q, history:[]})
+  });
+  if(!res.ok){ const t=await res.text(); throw new Error("HTTP "+res.status+" "+t.slice(0,120)); }
+  const j = await res.json();
+  const txt = j && j.text;
+  if(!txt) throw new Error("empty response");
+  return String(txt).trim();
+}
+function demoAnswer(q){
+  const match = DEMO_QA.find(p=>p.q.toLowerCase()===q.toLowerCase())
+    || DEMO_QA.find(p=>similar(p.q,q));
+  return match?match.a:FALLBACK_A;
+}
+function similar(a,b){
+  a=a.toLowerCase();b=b.toLowerCase();
+  const keys=[["evacuat","priorit","first"],["shelter","capacity"],["advisory","bahasa","draft","alert"],["why","high risk","kampung"],["pump","crew","allocat","resource"],["summar","situation","overview"]];
+  const bw=b.split(/\W+/);
+  return keys.some(set=>set.some(k=>b.includes(k)) && set.some(k=>a.includes(k)));
+}
+async function callGemini(key, q){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`;
+  const body = {
+    systemInstruction:{parts:[{text:citySystemPrompt()}]},
+    contents:[{role:"user",parts:[{text:q}]}],
+    generationConfig:{temperature:0.4, maxOutputTokens:2048}
+  };
+  const res = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!res.ok){ const t=await res.text(); throw new Error("HTTP "+res.status+" "+t.slice(0,120)); }
+  const j = await res.json();
+  const txt = j?.candidates?.[0]?.content?.parts?.map(p=>p.text).join("")||"";
+  if(!txt) throw new Error("empty response");
+  return txt.trim();
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+/* ============================================================
+   LIVE PHOTO TRIAGE (Citizen Reports)
+   Priority: backend > direct Gemini key > demo mode.
+   ============================================================ */
+const TRIAGE_TYPES = ["flooding","blocked_drain","landslide","infrastructure_damage","other"];
+const TRIAGE_TYPE_LABEL = {
+  flooding:"Flooding", blocked_drain:"Blocked drain", landslide:"Landslide risk",
+  infrastructure_damage:"Infrastructure damage", other:"Other"
+};
+const TRIAGE_TYPE_THUMB = {
+  flooding:"flood", blocked_drain:"drain", landslide:"landslide",
+  infrastructure_damage:"debris", other:"flood"
+};
+const DEMO_TRIAGE_POOL = [
+  {type:"flooding", severity:"HIGH", confidence:91, duplicate_suspect:false,
+   summary:"Street-level flooding with water above the curb; vehicles partially submerged and the access road is impassable."},
+  {type:"blocked_drain", severity:"MODERATE", confidence:84, duplicate_suspect:false,
+   summary:"Storm drain choked with debris is forcing runoff to pool across the roadway."},
+  {type:"landslide", severity:"HIGH", confidence:87, duplicate_suspect:false,
+   summary:"Slope failure with loose soil and a cracked retaining wall threatens the structures below."},
+  {type:"infrastructure_damage", severity:"MODERATE", confidence:80, duplicate_suspect:true,
+   summary:"Eroded embankment and a damaged culvert; likely duplicates an earlier report from the same area."}
+];
+
+function triageInstruction(note){
+  return `You are the Citizen Reports Triage classifier for ResilienceAI, a flood command center for Delta City during monsoon season. Analyze the attached citizen-submitted photo${note?` together with the citizen's note: "${note}"`:""} and classify the incident for a disaster-management operator.
+Return ONLY a single JSON object — no markdown, no code fences, no commentary — with exactly these keys:
+{"type": "flooding|blocked_drain|landslide|infrastructure_damage|other", "severity": "LOW|MODERATE|HIGH|SEVERE", "confidence": 0-100, "duplicate_suspect": true|false, "summary": "<one sentence>"}
+Base severity on visible water depth, structural danger, and threat to life. Set duplicate_suspect true only if the scene looks like a common/generic angle likely already reported.`;
+}
+function parseTriageJson(txt){
+  let s = (txt||"").trim();
+  s = s.replace(/^```(?:json)?\s*/i,"").replace(/```\s*$/,"").trim();
+  const a = s.indexOf("{"), b = s.lastIndexOf("}");
+  if(a>=0 && b>a) s = s.slice(a, b+1);
+  return normalizeTriage(JSON.parse(s));
+}
+function normalizeTriage(o){
+  o = o || {};
+  let type = String(o.type||"other").toLowerCase().replace(/\s+/g,"_");
+  if(!TRIAGE_TYPES.includes(type)) type = "other";
+  let severity = String(o.severity||"MODERATE").toUpperCase();
+  if(!RISK[severity]) severity = "MODERATE";
+  let confidence = Math.round(Number(o.confidence));
+  if(!isFinite(confidence)) confidence = 75;
+  confidence = Math.max(0, Math.min(100, confidence));
+  const summary = String(o.summary||"Citizen report classified by AI.").trim();
+  return {type, severity, confidence, duplicate_suspect: !!o.duplicate_suspect, summary};
+}
+async function callGeminiTriage(key, base64, mimeType, note){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`;
+  const body = {
+    contents:[{role:"user", parts:[
+      {inline_data:{mime_type:mimeType, data:base64}},
+      {text:triageInstruction(note)}
+    ]}],
+    generationConfig:{temperature:0.2, maxOutputTokens:2048, responseMimeType:"application/json", thinkingConfig:{thinkingBudget:0}}
+  };
+  const res = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!res.ok){ const t=await res.text(); throw new Error("HTTP "+res.status+" "+t.slice(0,120)); }
+  const j = await res.json();
+  const txt = j?.candidates?.[0]?.content?.parts?.map(p=>p.text).join("")||"";
+  if(!txt) throw new Error("empty response");
+  return parseTriageJson(txt);
+}
+async function callBackendTriage(base64, mimeType, note){
+  const res = await fetch("/api/triage",{
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({imageBase64:base64, mimeType:mimeType, note:note})
+  });
+  if(!res.ok){ const t=await res.text(); throw new Error("HTTP "+res.status+" "+t.slice(0,120)); }
+  const j = await res.json();
+  return normalizeTriage(j);
+}
+function demoTriage(){
+  const pick = SHOT ? DEMO_TRIAGE_POOL[0] : DEMO_TRIAGE_POOL[Math.floor(Math.random()*DEMO_TRIAGE_POOL.length)];
+  return new Promise(res=>{ SHOT ? res(pick) : setTimeout(()=>res(pick), 700); });
+}
+
+/* Inline SVG "photo" used to populate the shot-mode example (no real image). */
+function placeholderPhotoDataUrl(){
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 260'>`+
+    `<rect width='400' height='260' fill='#0e2036'/>`+
+    `<rect width='400' height='120' fill='#123049'/>`+
+    `<circle cx='320' cy='48' r='26' fill='#eab308' opacity='0.55'/>`+
+    `<rect x='60' y='40' width='60' height='90' fill='#2f4056'/>`+
+    `<rect x='150' y='24' width='72' height='106' fill='#39506a'/>`+
+    `<rect x='250' y='54' width='54' height='76' fill='#2a3b52'/>`+
+    `<path d='M0 150 Q100 138 200 150 T400 150 V260 H0Z' fill='#1e5a8a' opacity='0.9'/>`+
+    `<path d='M0 178 Q100 166 200 178 T400 178 V260 H0Z' fill='#2b7cb8' opacity='0.7'/>`+
+    `<path d='M0 206 Q100 196 200 206 T400 206 V260 H0Z' fill='#3a93cf' opacity='0.55'/>`+
+    `<rect x='96' y='150' width='58' height='24' rx='5' fill='#46586e'/>`+
+    `<circle cx='110' cy='176' r='8' fill='#1a2430'/><circle cx='142' cy='176' r='8' fill='#1a2430'/>`+
+    `</svg>`;
+  return "data:image/svg+xml;utf8,"+encodeURIComponent(svg);
+}
+
+let __liveReportSeq = 0;
+function addLiveReport(o){
+  const mount = document.getElementById("reportsMount");
+  if(!mount) return;
+  const c = RISK[o.severity].color;
+  const id = "CR-"+(4900 + (++__liveReportSeq));
+  const typeLabel = TRIAGE_TYPE_LABEL[o.type] || "Other";
+  const isDemo = o.mode === "demo";
+  const bannerCls = isDemo ? "rc-live-demo" : "rc-live";
+  const bannerText = isDemo ? "Demo mode · sample classification"
+    : (o.mode === "backend" ? "LIVE · classified via ResilienceAI backend" : "LIVE · classified by Gemini");
+  const bodyText = escapeHtml(o.summary || (o.note||"Citizen report."));
+  const card = document.createElement("div");
+  card.className = "report-card rc-live-card";
+  card.dataset.id = id;
+  card.innerHTML = `
+    <div class="rc-live-banner ${bannerCls}"><span class="lb-dot"></span>${bannerText}</div>
+    <div class="rc-top">
+      <div class="rc-thumb"><img src="${o.imgSrc}" alt="Citizen photo" /></div>
+      <div class="rc-main">
+        <div class="rc-head"><span class="rc-id">${id}</span><span class="rc-time">just now</span></div>
+        <div class="rc-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Citizen submission · geotag attached</div>
+        <div class="rc-text">${bodyText}</div>
+      </div>
+    </div>
+    <div class="rc-badges">
+      <span class="badge" style="background:${c}1a;color:${c};border-color:${c}4d">${o.severity}</span>
+      <span class="badge badge-type">${typeLabel}</span>
+      ${o.duplicate_suspect?`<span class="badge badge-dup"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>possible duplicate</span>`:``}
+      <span class="badge badge-ai"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.4 2.3 7.2L12 16.5 5.7 20.8 8 13.6 2 9.2h7.6z"/></svg>Gemini ${o.confidence}%</span>
+      <span class="conf-mini" style="margin-left:auto">conf <span class="conf-bar"><span style="width:${o.confidence}%"></span></span></span>
+    </div>
+    <div class="rc-actions">
+      <button class="rc-btn verify"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>Verify</button>
+      <button class="rc-btn dismiss"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg>Dismiss</button>
+    </div>`;
+  mount.insertBefore(card, mount.firstChild);
+  const n = document.getElementById("rpUnverified");
+  if(n) n.textContent = (+n.textContent || 0) + 1;
+  return card;
+}
+
+function showTriageMsg(text, kind){
+  const el = document.getElementById("triageMsg");
+  if(!el) return;
+  el.textContent = text || "";
+  el.className = "triage-msg" + (kind ? " "+kind : "");
+}
+
+let __triageDataUrl = null;
+function setTriagePreview(dataUrl){
+  __triageDataUrl = dataUrl;
+  const preview = document.getElementById("dzPreview");
+  const empty = document.getElementById("dzEmpty");
+  if(dataUrl){ preview.src = dataUrl; preview.hidden = false; empty.hidden = true; }
+  else { preview.removeAttribute("src"); preview.hidden = true; empty.hidden = false; }
+}
+function resetTriageForm(){
+  setTriagePreview(null);
+  const note = document.getElementById("noteInput");
+  if(note) note.value = "";
+  const input = document.getElementById("photoInput");
+  if(input) input.value = "";
+}
+function loadTriageFile(file){
+  if(!file){ return; }
+  if(!/^image\//.test(file.type)){ showTriageMsg("Please choose an image file (JPG, PNG…).","err"); return; }
+  const fr = new FileReader();
+  fr.onload = ()=>{
+    const img = new Image();
+    img.onload = ()=>{
+      // Downscale client-side: phone photos are often 5-12MB, beyond API limits
+      const MAX = 1600;
+      const scale = Math.min(1, MAX/Math.max(img.width, img.height));
+      if(scale < 1 || file.size > 1500000){
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width*scale);
+        c.height = Math.round(img.height*scale);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        setTriagePreview(c.toDataURL("image/jpeg", 0.85));
+      } else {
+        setTriagePreview(fr.result);
+      }
+      showTriageMsg("");
+    };
+    img.onerror = ()=>showTriageMsg("Could not read that image.","err");
+    img.src = fr.result;
+  };
+  fr.onerror = ()=>showTriageMsg("Could not read that file.","err");
+  fr.readAsDataURL(file);
+}
+async function runTriage(){
+  if(!__triageDataUrl){ showTriageMsg("Add a photo first.","err"); return; }
+  const btn = document.getElementById("classifyBtn");
+  const note = (document.getElementById("noteInput").value||"").trim();
+  const key = getKey();
+  const m = __triageDataUrl.match(/^data:([^;,]+)(?:;base64)?,(.*)$/);
+  const mimeType = m ? m[1] : "image/jpeg";
+  const base64 = (m && /;base64/.test(__triageDataUrl)) ? m[2] : "";
+  const orig = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = "Classifying…";
+  showTriageMsg("");
+  const dataUrl = __triageDataUrl;
+  try{
+    let result, mode;
+    if(BACKEND){ result = await callBackendTriage(base64, mimeType, note); mode = "backend"; }
+    else if(key){ result = await callGeminiTriage(key, base64, mimeType, note); mode = "live"; }
+    else { result = await demoTriage(); mode = "demo"; }
+    addLiveReport(Object.assign({imgSrc:dataUrl, note, mode}, result));
+    resetTriageForm();
+    showTriageMsg(mode==="demo" ? "Classified in demo mode — add a Gemini key or connect the backend for live triage." : "Classified and added to the top of the feed.","ok");
+  }catch(err){
+    /* graceful fallback: never break the feed */
+    try{
+      const result = await demoTriage();
+      addLiveReport(Object.assign({imgSrc:dataUrl, note, mode:"demo"}, result));
+      resetTriageForm();
+      showTriageMsg("Live classification failed — showed a demo result instead ("+String(err.message||err).slice(0,50)+").","err");
+    }catch(e2){
+      showTriageMsg("Classification failed. Please try again.","err");
+    }
+  }finally{
+    btn.disabled = false; btn.innerHTML = orig;
+  }
+}
+function wireTriage(){
+  const dz = document.getElementById("dropzone");
+  const input = document.getElementById("photoInput");
+  if(!dz || !input) return;
+  dz.addEventListener("click", ()=>input.click());
+  dz.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); input.click(); } });
+  input.addEventListener("change", ()=>{ if(input.files && input.files[0]) loadTriageFile(input.files[0]); });
+  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev, e=>{ e.preventDefault(); dz.classList.add("drag"); }));
+  ["dragleave","dragend"].forEach(ev=>dz.addEventListener(ev, e=>{ e.preventDefault(); dz.classList.remove("drag"); }));
+  dz.addEventListener("drop", e=>{
+    e.preventDefault(); dz.classList.remove("drag");
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) loadTriageFile(e.dataTransfer.files[0]);
+  });
+  document.getElementById("classifyBtn").addEventListener("click", runTriage);
+}
+function shotSeedTriage(){
+  const url = placeholderPhotoDataUrl();
+  const note = "Water rising fast on Jalan Sungai near the market — cars stuck, residents moving to upper floors.";
+  setTriagePreview(url);
+  document.getElementById("noteInput").value = note;
+  const pick = DEMO_TRIAGE_POOL[0];
+  addLiveReport(Object.assign({imgSrc:url, note, mode:"demo"}, pick));
+  showTriageMsg("Classified in demo mode — add a Gemini key or connect the backend for live triage.","ok");
+}
+
+function buildChips(){
+  const mount=document.getElementById("chipMount");
+  mount.innerHTML = DEMO_QA.map((p,i)=>`<button class="chip" data-q="${i}">${p.q}</button>`).join("");
+  mount.querySelectorAll(".chip").forEach(b=>b.addEventListener("click",()=>askCopilot(DEMO_QA[+b.dataset.q].q)));
+}
+function seedCopilot(){
+  chatScroll().innerHTML="";
+  addMsg("ai", `<p>👋 I'm your <strong>Response Assistant</strong>. I'm grounded on Delta City's live state — district risk, gauges, the 72h forecast, shelters, and citizen reports. Ask me anything, or pick a suggested question.</p>`);
+}
+function seedCopilotShot(){
+  chatScroll().innerHTML="";
+  addMsg("ai", `<p>👋 I'm your <strong>Response Assistant</strong>, grounded on Delta City's live state. Ask me anything, or pick a suggested question.</p>`);
+  addMsg("user", escapeHtml(DEMO_QA[0].q));
+  addMsg("ai", DEMO_QA[0].a);
+  addMsg("user", escapeHtml(DEMO_QA[2].q));
+  addMsg("ai", DEMO_QA[2].a);
+}
+
+/* ============================================================
+   SCENARIO SIMULATOR
+   ============================================================ */
+let scRain=180, scTrack="riverine";
+function buildTracks(){
+  const mount=document.getElementById("trackSelect");
+  mount.innerHTML = TRACKS.map(t=>`
+    <div class="track-opt ${t.id===scTrack?'active':''}" data-track="${t.id}">
+      <span class="to-radio"></span>
+      <span class="to-txt">${t.label}<small>${t.sub}</small></span>
+    </div>`).join("");
+  mount.querySelectorAll(".track-opt").forEach(o=>o.addEventListener("click",()=>{
+    scTrack=o.dataset.track;
+    mount.querySelectorAll(".track-opt").forEach(x=>x.classList.toggle("active",x===o));
+    renderScenario();
+  }));
+}
+function renderScenario(){
+  // map
+  const mount=document.getElementById("scenarioMapMount");
+  const tip=document.getElementById("scenarioTooltip");
+  mount.innerHTML="";
+  mount.appendChild(buildMap(scRain, scTrack, tip));
+  document.getElementById("scenarioLegend").innerHTML=buildLegend();
+  // slider fill
+  const slider=document.getElementById("rainSlider");
+  const pct=((scRain-20)/(320-20))*100;
+  slider.style.background=`linear-gradient(90deg,var(--accent) 0%,var(--accent) ${pct}%,rgba(148,163,184,0.2) ${pct}%)`;
+  document.getElementById("rainVal").textContent=scRain+" mm";
+  // summary counts
+  const counts={LOW:0,MODERATE:0,HIGH:0,SEVERE:0};
+  const cur={};
+  DISTRICTS.forEach(d=>{const r=districtRisk(d,scRain,scTrack);counts[r]++;cur[d.id]=r;});
+  document.getElementById("scenarioSummary").innerHTML = Object.entries(counts).map(([k,v])=>
+    `<div class="ss-tile" style="border-color:${RISK[k].color}44"><div class="ss-n" style="color:${RISK[k].color}">${v}</div><div class="ss-l">${k}</div></div>`).join("");
+  // delta vs baseline
+  const base={};DISTRICTS.forEach(d=>base[d.id]=districtRisk(d,180,"riverine"));
+  const order=["LOW","MODERATE","HIGH","SEVERE"];
+  let worse=0,better=0;
+  DISTRICTS.forEach(d=>{const di=order.indexOf(cur[d.id])-order.indexOf(base[d.id]); if(di>0)worse++; else if(di<0)better++;});
+  const trackLabel=TRACKS.find(t=>t.id===scTrack).label;
+  document.getElementById("scenarioScenarioLabel").textContent = (scRain===180&&scTrack==="riverine")?"Baseline scenario":`${scRain}mm · ${trackLabel}`;
+  let deltaMsg;
+  if(scRain===180&&scTrack==="riverine") deltaMsg=`<b>Baseline scenario</b> — matches the current national weather forecast (180mm) and observed storm track. 2 districts HIGH, 2 MODERATE.`;
+  else deltaMsg=`Versus baseline: <b style="color:${RISK.HIGH.color}">${worse} district${worse!==1?'s':''} escalated</b>, <b style="color:${RISK.LOW.color}">${better} de-escalated</b>. ${counts.SEVERE>0?`<b style="color:${RISK.SEVERE.color}">${counts.SEVERE} now SEVERE — mass evacuation threshold.</b>`:''} Recommendations and evacuation ordering would recompute accordingly.`;
+  document.getElementById("scenarioDelta").innerHTML=deltaMsg;
+  // district list with change
+  document.getElementById("scDistrictList").innerHTML = DISTRICTS.map(d=>{
+    const r=cur[d.id], b=base[d.id];
+    const changed=r!==b;
+    const c=RISK[r].color;
+    return `<div class="scd"><span>${d.name.replace("Central Business District","CBD")}</span>
+      <span><span class="scd-badge" style="background:${c}22;color:${c}">${r}</span>${changed?`<span class="scd-change">${order.indexOf(r)>order.indexOf(b)?'▲ from '+b:'▼ from '+b}</span>`:''}</span></div>`;
+  }).join("");
+}
+
+/* ============================================================
+   ROUTER / INIT
+   ============================================================ */
+const VIEWS = [
+  {id:"dashboard", label:"Dashboard", icon:`<svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>`},
+  {id:"assistant", label:"AI Assistant", icon:`<svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`},
+  {id:"reports", label:"Citizen Reports", icon:`<svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>`},
+  {id:"actions", label:"Actions", icon:`<svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`},
+  {id:"scenario", label:"What-If Simulator", icon:`<svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>`}
+];
+let curView="dashboard";
+function buildNav(){
+  const nav=document.getElementById("nav");
+  nav.innerHTML = VIEWS.map(v=>`<button data-view="${v.id}">${v.icon}${v.label}</button>`).join("");
+  nav.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.view)));
+}
+function go(view){
+  curView=view;
+  VIEWS.forEach(v=>{
+    document.getElementById("view-"+v.id).classList.toggle("active", v.id===view);
+  });
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active", b.dataset.view===view));
+  const u=new URL(location); u.searchParams.set("view",view); history.replaceState({},"",u);
+  if(view==="dashboard") renderDashboard();
+  if(view==="assistant" && !copilotSeeded){ SHOT?seedCopilotShot():seedCopilot(); copilotSeeded=true; }
+  if(view==="scenario") renderScenario();
+}
+let dashboardRendered=false, copilotSeeded=false;
+function renderDashboard(){
+  document.getElementById("kpiRow").innerHTML=buildKPIs();
+  const mapMount=document.getElementById("mapMount");
+  mapMount.innerHTML="";
+  mapMount.appendChild(buildMap(180,"riverine",document.getElementById("mapTooltip")));
+  document.getElementById("mapLegend").innerHTML=buildLegend();
+  document.getElementById("forecastMount").innerHTML=buildForecast();
+  document.getElementById("tickerMount").innerHTML=buildTicker();
+  const t=new Date(); document.getElementById("syncTime").textContent=t.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
+  if(!dashboardRendered){ startTicker(); dashboardRendered=true; }
+}
+
+/* Reports interactions */
+function wireReports(){
+  document.getElementById("reportsMount").addEventListener("click",e=>{
+    const btn=e.target.closest(".rc-btn"); if(!btn||btn.classList.contains("done"))return;
+    const card=btn.closest(".report-card");
+    const verify=btn.classList.contains("verify");
+    card.querySelectorAll(".rc-btn").forEach(b=>{b.classList.add("done");b.disabled=true;});
+    btn.innerHTML = verify?`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>Verified`:`Dismissed`;
+    btn.style.color = verify?"#7fe6a5":"#f39898";
+    card.style.opacity=verify?"1":"0.5";
+    if(!verify) card.style.filter="grayscale(0.4)";
+    const badge=card.querySelector(".badge");
+    if(verify){ const b=document.createElement("span"); b.className="badge"; b.style.cssText="background:rgba(34,197,94,0.14);color:#7fe6a5;border-color:rgba(34,197,94,0.35)"; b.textContent="✓ Operator verified"; card.querySelector(".rc-badges").appendChild(b);}
+    const n=document.getElementById("rpUnverified"); n.textContent=Math.max(0,(+n.textContent)-1);
+  });
+}
+/* Actions interactions */
+function wireActions(){
+  document.getElementById("actionsMount").addEventListener("click",e=>{
+    const btn=e.target.closest(".ac-explain-btn"); if(!btn)return;
+    const idx=btn.dataset.idx;
+    const panel=document.querySelector(`[data-explain="${idx}"]`);
+    const open=panel.classList.toggle("open"); btn.classList.toggle("open",open);
+    btn.childNodes[0].textContent = open?"Hide reasoning ":"Explain reasoning ";
+  });
+}
+
+/* Settings modal */
+function refreshMode(){
+  const hasKey=!!getKey();
+  const live=BACKEND||hasKey;
+  const badge=document.getElementById("modeBadge");
+  if(badge){
+    badge.className="mode-badge "+(live?"mode-live":"mode-demo");
+    const label=BACKEND?"Live · ResilienceAI backend":(hasKey?"Live · gemini-2.5-flash":"Demo mode");
+    badge.innerHTML=`<span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block"></span> ${label}`;
+  }
+  const ms=document.getElementById("modalModeStatus");
+  if(ms){
+    if(BACKEND){ms.style.cssText="background:rgba(34,197,94,0.12);color:#7fe6a5;border:1px solid rgba(34,197,94,0.3)";ms.innerHTML="● Connected to ResilienceAI backend (key managed server-side).";}
+    else if(hasKey){ms.style.cssText="background:rgba(34,197,94,0.12);color:#7fe6a5;border:1px solid rgba(34,197,94,0.3)";ms.innerHTML="● Live mode active — Assistant &amp; triage use real Gemini calls.";}
+    else{ms.style.cssText="background:rgba(129,140,248,0.12);color:#b6bdf9;border:1px solid rgba(129,140,248,0.3)";ms.innerHTML="● Demo mode — add a key to enable live Gemini calls.";}
+  }
+  const hint=document.getElementById("triageModeHint");
+  if(hint) hint.textContent=BACKEND?"Live · backend classification":(hasKey?"Live · Gemini classification":"Demo mode · sample classification");
+}
+function wireSettings(){
+  const ov=document.getElementById("modalOverlay");
+  document.getElementById("gearBtn").addEventListener("click",()=>{document.getElementById("apiKeyInput").value=getKey();refreshMode();ov.classList.add("show");});
+  document.getElementById("modalClose").addEventListener("click",()=>ov.classList.remove("show"));
+  ov.addEventListener("click",e=>{if(e.target===ov)ov.classList.remove("show");});
+  document.getElementById("saveKeyBtn").addEventListener("click",()=>{
+    const v=document.getElementById("apiKeyInput").value.trim();
+    if(v)localStorage.setItem("resai_gemini_key",v);else localStorage.removeItem("resai_gemini_key");
+    refreshMode(); ov.classList.remove("show");
+  });
+  document.getElementById("clearKeyBtn").addEventListener("click",()=>{
+    localStorage.removeItem("resai_gemini_key");document.getElementById("apiKeyInput").value="";refreshMode();
+  });
+}
+
+/* Chat form */
+function wireChat(){
+  const form=document.getElementById("chatForm"), input=document.getElementById("chatInput");
+  form.addEventListener("submit",e=>{e.preventDefault();const v=input.value.trim();if(!v)return;input.value="";input.style.height="auto";askCopilot(v);});
+  input.addEventListener("input",()=>{input.style.height="auto";input.style.height=Math.min(120,input.scrollHeight)+"px";});
+  input.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();form.requestSubmit();}});
+}
+function wireScenario(){
+  const slider=document.getElementById("rainSlider");
+  slider.addEventListener("input",()=>{scRain=+slider.value;renderScenario();});
+}
+
+/* Boot */
+function init(){
+  buildNav(); buildChips(); buildTracks();
+  document.getElementById("reportsMount").innerHTML=buildReports();
+  document.getElementById("actionsMount").innerHTML=buildActions();
+  wireReports(); wireActions(); wireSettings(); wireChat(); wireScenario(); wireTriage();
+  refreshMode();
+  // Probe for a ResilienceAI backend (silent/instant no-op on file://).
+  checkBackend();
+  // In shot mode, pre-populate a demo-classified example so the card is visible.
+  if(SHOT) shotSeedTriage();
+  // always pre-render dashboard so it's ready
+  renderDashboard();
+  const startView = params.get("view");
+  const valid = VIEWS.some(v=>v.id===startView);
+  go(valid?startView:"dashboard");
+}
+init();
+</script>
+</body>
+</html>

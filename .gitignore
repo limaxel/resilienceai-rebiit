@@ -1,0 +1,19 @@
+# Non-project artifacts (deck, docs, media) — submission repo carries code only
+*.pptx
+*.png
+*.jpg
+*.jpeg
+assets/
+deck/
+brief.md
+demo_video_guide.md
+
+# Build copy (deploy/index.html is synced from prototype/index.html at deploy time)
+deploy/index.html
+
+# Local tooling
+.claude/
+__pycache__/
+*.pyc
+genai_challenges.md
+*.pdf
