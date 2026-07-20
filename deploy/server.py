@@ -710,6 +710,75 @@ def triage():
     return jsonify(result)
 
 
+# ---------------------------------------------------------------- SMS channel
+# Data networks congest long before SMS does, and a feature phone has no browser
+# at all. Text is the lowest common denominator: no app, no install, no data plan.
+DISTRICT_NAMES = {d["name"].lower(): d["name"] for d in DISTRICTS}
+
+
+@app.post("/api/sms")
+def sms_inbound():
+    """Inbound citizen report by SMS.
+
+    Shaped for a carrier webhook (Twilio-style `From`/`Body`). No carrier is
+    connected in the prototype; the endpoint itself is live and does the real work.
+    """
+    body = request.get_json(force=True, silent=True) or {}
+    text = (body.get("Body") or body.get("text") or "").strip()
+    sender = (body.get("From") or body.get("from") or "anonymous").strip()[:40]
+    if not text:
+        return jsonify({"error": "empty message"}), 400
+    instruction = (
+        "You are triaging a flood report that a citizen sent by SMS in Delta City during "
+        "monsoon season. The message may be terse, misspelled, in English or Bahasa "
+        "Indonesia, or mixed. Extract what you can and return ONLY JSON with keys: "
+        '"district" (one of: ' + ", ".join(d["name"] for d in DISTRICTS) + ', or "Unknown"), '
+        '"type" (flooding|blocked_drain|landslide|infrastructure_damage|other), '
+        '"severity" (LOW|MODERATE|HIGH|SEVERE), "confidence" (0-100 integer), '
+        '"summary" (one sentence in English), '
+        '"language" (the ISO code of the language the citizen wrote in: "en" or "id"), '
+        '"reply" (a calm SMS reply, max 300 characters, telling them what to do right '
+        'now and that the report was received). '
+        "CRITICAL: the reply MUST be written in the same language as the citizen's "
+        'message. If "language" is "en" the reply is in English only; if "id" the reply '
+        "is in Bahasa Indonesia only. Do not mix languages. "
+        "Base severity on threat to life and the depth described.\n"
+        "Citizen SMS: " + text[:600]
+    )
+    try:
+        out = generate([{"role": "user", "parts": [{"text": instruction}]}],
+                       temp=0.2, max_tokens=1024, json_mode=True, no_thinking=True)
+        out = re.sub(r"^```(?:json)?|```$", "", out.strip(), flags=re.M).strip()
+        parsed = json.loads(out)
+    except Exception as exc:
+        # Never drop a citizen's message because the model is unavailable.
+        store_report({"ts": int(time.time()), "type": "other", "severity": "MODERATE",
+                      "confidence": 0, "duplicate_suspect": False,
+                      "summary": f"Unparsed SMS: {text[:200]}", "note": text[:500],
+                      "district": "Unknown", "source": "sms", "thumb": ""})
+        return jsonify({"stored": True, "parsed": False, "error": str(exc)[:120],
+                        "reply": "Report received. Move to higher ground if water is "
+                                 "rising and call 112 if you are in danger."}), 200
+    district = str(parsed.get("district") or "Unknown")
+    district = DISTRICT_NAMES.get(district.lower(), district)[:60]
+    doc = {
+        "ts": int(time.time()),
+        "type": str(parsed.get("type", "other"))[:40],
+        "severity": str(parsed.get("severity", "MODERATE"))[:10],
+        "confidence": int(parsed.get("confidence") or 60),
+        "duplicate_suspect": False,
+        "summary": str(parsed.get("summary", ""))[:400],
+        "note": text[:500], "district": district, "source": "sms",
+        "sender": sender, "thumb": "",
+    }
+    doc_id = store_report(doc)
+    return jsonify({"stored": bool(doc_id), "parsed": True, "id": doc_id,
+                    "district": district, "type": doc["type"], "severity": doc["severity"],
+                    "confidence": doc["confidence"], "summary": doc["summary"],
+                    "language": str(parsed.get("language", ""))[:5],
+                    "reply": str(parsed.get("reply", ""))[:320]})
+
+
 PLAN_CATS = ["Evacuation", "Pump deployment", "Road closure", "Shelter activation",
              "Public advisory", "Rescue operation", "Field recon", "Infrastructure", "Other"]
 

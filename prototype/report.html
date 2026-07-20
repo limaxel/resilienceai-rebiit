@@ -53,6 +53,7 @@
   .live-tag.off{color:#f0cf5e;background:rgba(234,179,8,0.1);border-color:rgba(234,179,8,0.35)}
   .live-tag.off .live-dot{background:#eab308}
   .netbar{display:flex;align-items:center;gap:8px;font-size:12px;border-radius:12px;padding:9px 12px;margin-bottom:12px;border:1px solid var(--border);background:var(--panel)}
+  .netbar[hidden],.install[hidden],.area[hidden]{display:none}
   .netbar.offline{background:rgba(234,179,8,0.09);border-color:rgba(234,179,8,0.35);color:#f0cf5e}
   .netbar.queued{background:rgba(56,189,248,0.09);border-color:rgba(56,189,248,0.35);color:#7dd3fc}
   .netbar b{font-weight:700}
@@ -61,6 +62,20 @@
   .sizehint{font-size:11.5px;color:var(--muted);margin-top:7px}
   .sizehint b{color:#7fe6a5}
   .queued-note{background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.3);color:#7dd3fc;border-radius:12px;padding:11px 13px;font-size:12.5px;margin-top:12px}
+  .area{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:13px 15px;margin-bottom:12px}
+  .area-dot{width:11px;height:11px;border-radius:50%;flex:none}
+  .area-main{flex:1;min-width:0}
+  .area-t{font-size:13px;font-weight:700}
+  .area-s{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .area select{width:auto;margin:0;padding:7px 9px;font-size:12px;border-radius:9px}
+  .install{display:flex;align-items:center;gap:11px;background:linear-gradient(90deg,rgba(56,189,248,0.13),rgba(129,140,248,0.09));border:1px solid rgba(56,189,248,0.35);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+  .install-b{flex:none;padding:8px 13px;border-radius:10px;border:none;background:linear-gradient(160deg,#0ea5e9,#6366f1);color:#fff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
+  .install-x{flex:none;background:none;border:none;color:var(--muted);font-size:19px;cursor:pointer;line-height:1;padding:0 2px}
+  .modes{display:flex;gap:8px;margin-bottom:13px}
+  .mode-b{flex:1;padding:10px 8px;border-radius:11px;border:1px solid var(--border);background:var(--panel-2);color:var(--muted);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-align:center;line-height:1.35}
+  .mode-b.on{border-color:rgba(56,189,248,0.6);background:rgba(56,189,248,0.12);color:#cfe6f7}
+  .mode-b small{display:block;font-size:10.5px;font-weight:500;opacity:.75;margin-top:2px}
+  .speak{display:inline-flex;align-items:center;gap:7px;margin-top:11px;padding:9px 13px;border-radius:10px;border:1px solid rgba(56,189,248,0.4);background:rgba(56,189,248,0.1);color:#7dd3fc;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
   footer{font-size:11px;color:var(--muted);text-align:center;margin-top:18px}
 </style>
 </head>
@@ -84,9 +99,36 @@
 
   <div class="netbar" id="netbar" hidden></div>
 
+  <div class="install" id="installBar" hidden>
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:700">Add to your home screen</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:2px">So it still works when the power and the network go down.</div>
+    </div>
+    <button class="install-b" id="installBtn">Add</button>
+    <button class="install-x" id="installX" aria-label="Dismiss">×</button>
+  </div>
+
+  <div class="area" id="areaCard" hidden>
+    <span class="area-dot" id="areaDot"></span>
+    <div class="area-main">
+      <div class="area-t" id="areaTitle">Your area</div>
+      <div class="area-s" id="areaSub">Checking conditions…</div>
+    </div>
+    <select id="areaSelect" aria-label="Your district">
+      <option value="">Set area</option>
+      <option>Riverside North</option><option>Kampung Baru</option><option>Old Quarter</option>
+      <option>Southbank</option><option>Central Business District</option><option>Harbor East</option>
+      <option>Eastgate</option><option>Hillside West</option>
+    </select>
+  </div>
+
   <div class="card" id="formCard">
     <h2>Report what you see</h2>
     <div class="hint">Your photo is analyzed by AI and sent straight to the city's flood operations center.</div>
+    <div class="modes">
+      <button class="mode-b on" id="modeUrgent" type="button">Happening now<small>Flooding, landslide, danger</small></button>
+      <button class="mode-b" id="modeMaint" type="button">Maintenance<small>Blocked drain, damage</small></button>
+    </div>
     <div class="dz" id="dz" role="button" tabindex="0" aria-label="Take or upload a photo">
       <input type="file" id="photo" accept="image/*" capture="environment" hidden />
       <svg class="cam" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -116,6 +158,10 @@
     </div>
     <div class="res-sum" id="resSum"></div>
     <div class="advice" id="advice"></div>
+    <button class="speak" id="speakBtn" type="button">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      Listen to this advice
+    </button>
     <div class="sent-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>Report received by Delta City flood operations · AI-classified in the operator queue</div>
     <button class="again" id="againBtn">Report something else</button>
   </div>
@@ -243,13 +289,109 @@ function fmtBytes(n){
   return n >= 1048576 ? (n/1048576).toFixed(1)+" MB" : Math.max(1, Math.round(n/1024))+" KB";
 }
 
+/* ============================================================
+   ADOPTION
+   Nobody installs a disaster app on a sunny day. So the app has to be
+   worth opening on a normal one: check your area, and report the blocked
+   drain that causes next month's flood. The install prompt is framed
+   around the one thing a native app store page can't promise — that it
+   keeps working when the network doesn't.
+   ============================================================ */
+let deferredInstall = null;
+window.addEventListener("beforeinstallprompt", e=>{
+  e.preventDefault();
+  deferredInstall = e;
+  if(localStorage.getItem("resalert_install_dismissed") !== "1") $("installBar").hidden = false;
+});
+$("installBtn").addEventListener("click", async ()=>{
+  $("installBar").hidden = true;
+  if(deferredInstall){ deferredInstall.prompt(); deferredInstall = null; }
+});
+$("installX").addEventListener("click", ()=>{
+  $("installBar").hidden = true;
+  localStorage.setItem("resalert_install_dismissed", "1");
+});
+
+const RISK_LABEL = {
+  LOW:      ["Normal", "No flood risk expected in your area right now."],
+  MODERATE: ["Stay alert", "Water levels are rising. Keep an eye on conditions."],
+  HIGH:     ["Be ready to move", "Flooding is likely here. Prepare to go to higher ground."],
+  SEVERE:   ["Act now", "Severe flooding expected. Move to higher ground immediately."]
+};
+async function refreshArea(){
+  const area = localStorage.getItem("resalert_area") || "";
+  const sel = $("areaSelect");
+  if(sel && area) sel.value = area;
+  $("areaCard").hidden = false;
+  if(!area){
+    $("areaDot").style.background = "#64748b";
+    $("areaTitle").textContent = "Set your area";
+    $("areaSub").textContent = "See flood conditions where you live, any day.";
+    return;
+  }
+  try{
+    const r = await fetch("/api/state", {cache:"no-store"});
+    const j = await r.json();
+    const d = (j.districts||[]).find(x=>x.name===area);
+    if(!d) return;
+    if(d.comms === "blackout"){
+      $("areaDot").style.background = "#94a3b8";
+      $("areaTitle").textContent = area + " — no data";
+      $("areaSub").textContent = "Sensors here are offline. Treat conditions as worse than last reported.";
+      return;
+    }
+    const lab = RISK_LABEL[d.risk] || RISK_LABEL.LOW;
+    $("areaDot").style.background = RISK_COLOR[d.risk] || "#22c55e";
+    $("areaTitle").textContent = area + " — " + lab[0];
+    $("areaSub").textContent = lab[1] + " River level " + d.gauge + "m.";
+  }catch(e){
+    $("areaTitle").textContent = area;
+    $("areaSub").textContent = "Conditions unavailable offline — last known status shown in the app.";
+  }
+}
+$("areaSelect").addEventListener("change", ()=>{
+  localStorage.setItem("resalert_area", $("areaSelect").value);
+  const d = $("district");
+  if(d && $("areaSelect").value) d.value = $("areaSelect").value;
+  refreshArea();
+});
+
+let reportMode = "urgent";
+function setMode(m){
+  reportMode = m;
+  $("modeUrgent").classList.toggle("on", m==="urgent");
+  $("modeMaint").classList.toggle("on", m==="maint");
+  $("note").placeholder = m==="maint"
+    ? "What needs fixing? e.g. drain blocked with rubbish, broken culvert, damaged embankment…"
+    : "What's happening? e.g. water entering homes, drain overflowing, road flooded…";
+}
+$("modeUrgent").addEventListener("click", ()=>setMode("urgent"));
+$("modeMaint").addEventListener("click", ()=>setMode("maint"));
+
+/* Spoken advice — on-device speech synthesis: free, and works with no network. */
+function speakAdvice(){
+  if(!("speechSynthesis" in window)) return;
+  const items = Array.from(document.querySelectorAll("#advice li")).map(li=>li.textContent);
+  if(!items.length) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(items.join(". "));
+  u.rate = 0.95;
+  const area = localStorage.getItem("resalert_area") || "";
+  u.lang = "en-US";
+  speechSynthesis.speak(u);
+}
+$("speakBtn").addEventListener("click", speakAdvice);
+if(!("speechSynthesis" in window)) $("speakBtn").style.display = "none";
+
 navigator.serviceWorker && navigator.serviceWorker.register("/sw.js").catch(()=>{});
 navigator.serviceWorker && navigator.serviceWorker.addEventListener("message", e=>{
   if(e.data && e.data.type === "flush-reports") flushQueue();
 });
-window.addEventListener("online", ()=>{ checkHealth().then(flushQueue); });
+window.addEventListener("online", ()=>{ checkHealth().then(flushQueue).then(refreshArea); });
 window.addEventListener("offline", paintNet);
 checkHealth().then(flushQueue);
+setMode("urgent");
+refreshArea();
 
 $("dz").addEventListener("click", ()=>$("photo").click());
 $("dz").addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();$("photo").click();} });
@@ -329,10 +471,10 @@ function buildPayload(thumb){
   return {
     imageBase64: (m && /;base64/.test(dataUrl)) ? m[2] : "",
     mimeType: m ? m[1] : "image/jpeg",
-    note: $("note").value.trim(),
-    district: $("district").value || "Citizen submission",
+    note: (reportMode === "maint" ? "[maintenance] " : "") + $("note").value.trim(),
+    district: $("district").value || localStorage.getItem("resalert_area") || "Citizen submission",
     thumbnail: thumb,
-    source: "citizen-app"
+    source: reportMode === "maint" ? "citizen-app-maintenance" : "citizen-app"
   };
 }
 

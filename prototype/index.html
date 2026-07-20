@@ -220,6 +220,18 @@ button{font-family:inherit}
 .bubble ol,.bubble ul{margin:6px 0 9px;padding-left:20px}
 .bubble li{margin-bottom:5px}
 .bubble strong{color:#fff}
+.sms-note{font-size:12.5px;color:var(--muted);line-height:1.55;margin-bottom:14px}
+.sms-note b{color:var(--text)}
+.sms-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:900px){.sms-grid{grid-template-columns:1fr}}
+.sms-label{display:block;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:7px}
+.sms-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.sms-chip{font-size:11.5px;padding:5px 10px;border-radius:99px;border:1px solid var(--border);background:var(--panel-2);color:var(--muted);cursor:pointer}
+.sms-chip:hover{color:var(--text);border-color:rgba(56,189,248,0.45)}
+.sms-result{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:14px}
+.sms-empty{font-size:12.5px;color:var(--muted)}
+.sms-phone{background:rgba(56,189,248,0.09);border:1px solid rgba(56,189,248,0.3);border-radius:11px;padding:11px 13px;font-size:12.5px;color:#cfe6f7;line-height:1.5;margin-top:11px}
+.sms-phone .sp-h{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#7dd3fc;font-weight:700;margin-bottom:5px}
 .comms-alert{display:flex;align-items:flex-start;gap:13px;background:linear-gradient(90deg,rgba(100,116,139,0.18),rgba(148,163,184,0.09));border:1px solid rgba(148,163,184,0.42);border-left:4px solid #94a3b8;border-radius:12px;padding:13px 16px;margin-bottom:16px}
 .ca-icon{color:#cbd5e1;flex:none;margin-top:1px}
 .ca-title{font-size:13px;font-weight:800;letter-spacing:.05em;color:#e2e8f0;margin-bottom:4px}
@@ -564,6 +576,28 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
             <span class="triage-msg" id="triageMsg"></span>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="smsPanel" style="display:none">
+    <div class="panel-head">
+      <h2><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> SMS reporting channel <span style="font-size:11px;color:var(--low);font-weight:500;margin-left:4px">● endpoint live</span></h2>
+      <span class="ph-sub">Data networks congest before SMS does — and a feature phone has no browser at all</span>
+    </div>
+    <div class="panel-body">
+      <div class="sms-note">Citizens with no data, no smartphone or no app can still report by text. Gemini parses the message into a structured report and writes the reply in the sender's own language. <b>The endpoint is live and doing the real work</b> — a carrier number is not connected in the prototype, so this console stands in for the SMS gateway.</div>
+      <div class="sms-grid">
+        <div>
+          <label class="sms-label">Inbound SMS from a citizen</label>
+          <textarea class="note-input" id="smsInput" style="min-height:74px" placeholder="e.g. air masuk rumah di kampung baru, setinggi lutut, tolong"></textarea>
+          <div class="sms-chips" id="smsChips"></div>
+          <button class="btn primary" id="smsSendBtn" type="button" style="margin-top:10px;display:inline-flex;align-items:center;gap:7px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Deliver to gateway
+          </button>
+        </div>
+        <div id="smsResult" class="sms-result"><div class="sms-empty">Parsed report and the automatic reply will appear here.</div></div>
       </div>
     </div>
   </div>
@@ -1807,6 +1841,52 @@ async function runTriage(){
     btn.disabled = false; btn.innerHTML = orig;
   }
 }
+/* ---------- SMS channel console ----------
+   Stands in for a carrier gateway. The endpoint behind it is real. */
+const SMS_SAMPLES = [
+  "air masuk rumah di kampung baru, setinggi lutut, tolong",
+  "water waist deep jalan sungai riverside north, cars stuk, old ppl upstair need help",
+  "drain blocked with rubbish heritage lane old quarter, water pooling"
+];
+function wireSms(){
+  const chips = document.getElementById("smsChips");
+  const input = document.getElementById("smsInput");
+  const btn = document.getElementById("smsSendBtn");
+  const out = document.getElementById("smsResult");
+  if(!chips || !input || !btn) return;
+  chips.innerHTML = SMS_SAMPLES.map((s,i)=>`<button class="sms-chip" data-i="${i}">${escapeHtml(s.slice(0,42))}…</button>`).join("");
+  chips.querySelectorAll(".sms-chip").forEach(b=>b.addEventListener("click",()=>{input.value=SMS_SAMPLES[+b.dataset.i];}));
+  btn.addEventListener("click", async ()=>{
+    const text = (input.value||"").trim();
+    if(!text){ out.innerHTML = `<div class="sms-empty" style="color:#f0cf5e">Type a message first.</div>`; return; }
+    const orig = btn.innerHTML;
+    btn.disabled = true; btn.textContent = "Parsing…";
+    out.innerHTML = `<div class="sms-empty">Gemini is parsing the message…</div>`;
+    try{
+      const res = await fetch("/api/sms",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({From:"+62 812 555 0134", Body:text})});
+      const j = await res.json();
+      const sev = RISK[j.severity] ? j.severity : "MODERATE";
+      const c = RISK[sev].color;
+      out.innerHTML = `
+        <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:9px">
+          <span class="badge" style="background:${c}1a;color:${c};border-color:${c}4d">${sev}</span>
+          <span class="badge badge-type">${escapeHtml(TRIAGE_TYPE_LABEL[j.type]||"Other")}</span>
+          <span class="badge badge-type">${escapeHtml(j.district||"Unknown")}</span>
+          ${j.language?`<span class="badge badge-type">lang: ${escapeHtml(j.language)}</span>`:""}
+          <span class="badge badge-ai">Gemini ${j.confidence||0}%</span>
+          ${j.stored?`<span class="badge" style="background:rgba(34,197,94,0.14);color:#7fe6a5;border-color:rgba(34,197,94,0.35)">✓ in operator queue</span>`:""}
+        </div>
+        <div style="font-size:13px;line-height:1.55">${escapeHtml(j.summary||"")}</div>
+        <div class="sms-phone"><div class="sp-h">Automatic reply sent to +62 812 555 0134</div>${escapeHtml(j.reply||"")}</div>`;
+      refreshServerReports();
+    }catch(err){
+      out.innerHTML = `<div class="sms-empty" style="color:#f0cf5e">Gateway error: ${escapeHtml(String(err.message||err).slice(0,80))}</div>`;
+    }finally{
+      btn.disabled = false; btn.innerHTML = orig;
+    }
+  });
+}
 function wireTriage(){
   const dz = document.getElementById("dropzone");
   const input = document.getElementById("photoInput");
@@ -2027,6 +2107,8 @@ function refreshMode(){
   });
   const db=document.getElementById("blackoutDrillBtn");
   if(db) db.style.display = BACKEND ? "inline-block" : "none";
+  const sp=document.getElementById("smsPanel");
+  if(sp) sp.style.display = BACKEND ? "" : "none";
   const ms=document.getElementById("modalModeStatus");
   if(ms){
     if(BACKEND){ms.style.cssText="background:rgba(34,197,94,0.12);color:#7fe6a5;border:1px solid rgba(34,197,94,0.3)";ms.innerHTML="● Connected to ResilienceAI backend (key managed server-side).";}
@@ -2070,7 +2152,7 @@ function init(){
   buildNav(); buildChips(); buildTracks();
   document.getElementById("reportsMount").innerHTML=buildReports();
   document.getElementById("actionsMount").innerHTML=buildActions();
-  wireReports(); wireActions(); wireSettings(); wireChat(); wireScenario(); wireTriage();
+  wireReports(); wireActions(); wireSettings(); wireChat(); wireScenario(); wireTriage(); wireSms();
   refreshMode();
   // Probe for a ResilienceAI backend (silent/instant no-op on file://), then run
   // any auto-actions (?ask= / ?plan=1) used for capturing authentic live states.

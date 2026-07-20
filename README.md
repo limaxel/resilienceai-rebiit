@@ -41,8 +41,18 @@ A flood platform that needs good bandwidth, mains power and healthy cell towers 
 | No connectivity at all | Reports are captured offline (service worker + IndexedDB), return immediate safety guidance, and flush automatically via Background Sync |
 | A district goes dark | **Comms blackout detection** — silence is treated as escalation, not safety. The district is flagged as a blind spot with stale readings, and the agents dispatch a field team |
 | AI layer unreachable | Explicit **degraded mode**: deterministic rule-based triage computed from live state, clearly labelled as not-AI — never canned text presented as intelligence |
+| No app, no smartphone, no data plan | **SMS reporting** (`POST /api/sms`) — Gemini parses a free-text message into a structured report and replies in the sender's own language |
 
-Try it: the dashboard has a **comms-blackout drill** button, and `/report` works with the network switched off.
+Try it: the dashboard has a **comms-blackout drill** button, the Citizen Reports tab has an **SMS gateway console**, and `/report` works with the network switched off.
+
+### The adoption problem
+
+Offline capability only helps if the app is there *before* the flood — and nobody installs a disaster app on a sunny day. So adoption is layered rather than assumed:
+
+- **No install required at all.** SMS works from any phone. This is the floor, and it never depends on a download.
+- **The warning is the distribution channel.** Cities already blast SMS flood warnings. A link in that message loads a ~50 KB page that is offline-capable from that moment — no app store, no waiting, at the point of peak intent.
+- **Everyday utility earns the install beforehand.** Check your area's river level any day, and report blocked drains and damaged culverts year-round. Dry-season drain maintenance is flood prevention, so the "boring" use case feeds the same pipeline.
+- **Accessibility.** Safety advice is read aloud on-device, so it works for low-literacy users and with no network.
 
 ## Architecture
 
