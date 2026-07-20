@@ -8,9 +8,9 @@
 <title>ResilienceAlert — Report Flooding</title>
 <style>
   :root{
-    --bg:#0a1322; --panel:#101c30; --panel-2:#16243c; --border:rgba(148,163,184,0.16);
-    --text:#e8eef7; --muted:#8fa0b8; --accent:#38bdf8; --accent2:#818cf8;
-    --low:#22c55e; --mod:#eab308; --high:#f97316; --sev:#ef4444;
+    --bg:#0c0f14; --panel:#12171f; --panel-2:#171d26; --border:#242b36;
+    --text:#e6edf3; --muted:#9aa4b2; --accent:#4493f8; --accent2:#6ea8fe;
+    --low:#3fb950; --mod:#d29922; --high:#db6d28; --sev:#f85149;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;overflow-x:hidden}
@@ -20,8 +20,8 @@
   .name{font-weight:800;font-size:17px;letter-spacing:.2px}
   .name b{color:var(--accent)}
   .sub{font-size:11.5px;color:var(--muted)}
-  .alert-strip{background:linear-gradient(90deg,rgba(249,115,22,0.16),rgba(239,68,68,0.14));border:1px solid rgba(249,115,22,0.35);border-radius:12px;padding:10px 13px;font-size:12.5px;color:#fbd0a8;margin-bottom:16px}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px}
+  .alert-strip{background:rgba(219,109,40,0.12);border:1px solid rgba(219,109,40,0.4);border-left:3px solid var(--high);border-radius:6px;padding:10px 13px;font-size:12.5px;color:#fbd0a8;margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:14px}
   h2{font-size:15px;margin-bottom:4px}
   .hint{font-size:12px;color:var(--muted);margin-bottom:12px}
   .dz{border:1.5px dashed rgba(56,189,248,0.4);border-radius:14px;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;color:var(--muted);font-size:13px;text-align:center;padding:14px;position:relative;overflow:hidden}
@@ -30,7 +30,7 @@
   select,textarea{width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:11px;color:var(--text);font:inherit;font-size:14px;padding:11px 12px;margin-top:10px}
   textarea{min-height:74px;resize:vertical}
   select:focus,textarea:focus{outline:none;border-color:rgba(56,189,248,0.5)}
-  .send{width:100%;margin-top:14px;padding:14px;border:none;border-radius:12px;background:linear-gradient(160deg,#0ea5e9,#6366f1);color:#fff;font:inherit;font-weight:700;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px}
+  .send{width:100%;margin-top:14px;padding:14px;border:none;border-radius:12px;background:#1f6feb;color:#fff;font:inherit;font-weight:650;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px}
   .send:disabled{opacity:.6}
   .msg{font-size:12.5px;margin-top:10px;min-height:16px}
   .msg.err{color:#f0cf5e}
@@ -62,14 +62,14 @@
   .sizehint{font-size:11.5px;color:var(--muted);margin-top:7px}
   .sizehint b{color:#7fe6a5}
   .queued-note{background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.3);color:#7dd3fc;border-radius:12px;padding:11px 13px;font-size:12.5px;margin-top:12px}
-  .area{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:13px 15px;margin-bottom:12px}
+  .area{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:13px 15px;margin-bottom:12px}
   .area-dot{width:11px;height:11px;border-radius:50%;flex:none}
   .area-main{flex:1;min-width:0}
   .area-t{font-size:13px;font-weight:700}
   .area-s{font-size:11.5px;color:var(--muted);margin-top:2px}
   .area select{width:auto;margin:0;padding:7px 9px;font-size:12px;border-radius:9px}
-  .install{display:flex;align-items:center;gap:11px;background:linear-gradient(90deg,rgba(56,189,248,0.13),rgba(129,140,248,0.09));border:1px solid rgba(56,189,248,0.35);border-radius:14px;padding:12px 14px;margin-bottom:12px}
-  .install-b{flex:none;padding:8px 13px;border-radius:10px;border:none;background:linear-gradient(160deg,#0ea5e9,#6366f1);color:#fff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
+  .install{display:flex;align-items:center;gap:11px;background:var(--panel-2);border:1px solid var(--border-strong,#333c4a);border-radius:8px;padding:12px 14px;margin-bottom:12px}
+  .install-b{flex:none;padding:8px 13px;border-radius:10px;border:none;background:#1f6feb;color:#fff;font:inherit;font-size:12.5px;font-weight:650;cursor:pointer}
   .install-x{flex:none;background:none;border:none;color:var(--muted);font-size:19px;cursor:pointer;line-height:1;padding:0 2px}
   .modes{display:flex;gap:8px;margin-bottom:13px}
   .mode-b{flex:1;padding:10px 8px;border-radius:11px;border:1px solid var(--border);background:var(--panel-2);color:var(--muted);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-align:center;line-height:1.35}
@@ -171,7 +171,7 @@
 
 <script>
 "use strict";
-const RISK_COLOR = {LOW:"#22c55e", MODERATE:"#eab308", HIGH:"#f97316", SEVERE:"#ef4444"};
+const RISK_COLOR = {LOW:"#3fb950", MODERATE:"#d29922", HIGH:"#db6d28", SEVERE:"#f85149"};
 const TYPE_LABEL = {flooding:"Flooding", blocked_drain:"Blocked drain", landslide:"Landslide risk", infrastructure_damage:"Infrastructure damage", other:"Report received"};
 const ADVICE = {
   SEVERE: ["Move to higher ground or an upper floor now.","Do not walk or drive through floodwater.","Help children and elderly neighbours if it is safe.","Nearest shelters: Riverside Community Hall · Northgate Sports Complex."],
