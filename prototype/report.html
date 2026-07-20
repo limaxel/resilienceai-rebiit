@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0a1322" />
+<link rel="manifest" href="/manifest.webmanifest" />
 <title>ResilienceAlert — Report Flooding</title>
 <style>
   :root{
@@ -49,6 +50,17 @@
   .live-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#7fe6a5;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:99px;padding:3px 10px;margin-left:auto}
   .live-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:blink 1.6s infinite}
   @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+  .live-tag.off{color:#f0cf5e;background:rgba(234,179,8,0.1);border-color:rgba(234,179,8,0.35)}
+  .live-tag.off .live-dot{background:#eab308}
+  .netbar{display:flex;align-items:center;gap:8px;font-size:12px;border-radius:12px;padding:9px 12px;margin-bottom:12px;border:1px solid var(--border);background:var(--panel)}
+  .netbar.offline{background:rgba(234,179,8,0.09);border-color:rgba(234,179,8,0.35);color:#f0cf5e}
+  .netbar.queued{background:rgba(56,189,248,0.09);border-color:rgba(56,189,248,0.35);color:#7dd3fc}
+  .netbar b{font-weight:700}
+  .lowband{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--muted);margin-top:10px;cursor:pointer;user-select:none}
+  .lowband input{width:16px;height:16px;accent-color:var(--accent)}
+  .sizehint{font-size:11.5px;color:var(--muted);margin-top:7px}
+  .sizehint b{color:#7fe6a5}
+  .queued-note{background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.3);color:#7dd3fc;border-radius:12px;padding:11px 13px;font-size:12.5px;margin-top:12px}
   footer{font-size:11px;color:var(--muted);text-align:center;margin-top:18px}
 </style>
 </head>
@@ -70,6 +82,8 @@
 
   <div class="alert-strip">⚠ <b>Monsoon watch active.</b> A tropical storm is approaching Delta City. If you are in danger, call 112. Use this app to report flooding around you — every report helps the city respond faster.</div>
 
+  <div class="netbar" id="netbar" hidden></div>
+
   <div class="card" id="formCard">
     <h2>Report what you see</h2>
     <div class="hint">Your photo is analyzed by AI and sent straight to the city's flood operations center.</div>
@@ -86,6 +100,8 @@
       <option>Eastgate</option><option>Hillside West</option>
     </select>
     <textarea id="note" placeholder="What's happening? e.g. water entering homes, drain overflowing, road flooded…"></textarea>
+    <label class="lowband"><input type="checkbox" id="lowBand" /> Low-bandwidth mode — send a smaller photo on a weak network</label>
+    <div class="sizehint" id="sizeHint"></div>
     <button class="send" id="sendBtn">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
       Send report
@@ -115,40 +131,158 @@ const ADVICE = {
   SEVERE: ["Move to higher ground or an upper floor now.","Do not walk or drive through floodwater.","Help children and elderly neighbours if it is safe.","Nearest shelters: Riverside Community Hall · Northgate Sports Complex."],
   HIGH: ["Prepare to move to higher ground — pack medicines and documents.","Avoid the riverbank and underpasses.","Charge your phone and follow official updates."],
   MODERATE: ["Stay alert and avoid flooded streets.","Move vehicles and valuables off the ground floor if you can.","Check on neighbours who may need help."],
-  LOW: ["Thanks for the report — operators will verify it.","Stay informed via official channels.","Report again if conditions change."]
+  LOW: ["Thanks for the report — operators will verify it.","Stay informed via official channels.","Report again if conditions change."],
+  OFFLINE: [
+    "Do not wait for a reply — if water is rising, move to higher ground or an upper floor now.",
+    "Do not walk or drive through floodwater, and stay away from the riverbank.",
+    "Save your phone battery: power may be cut in flooded areas.",
+    "If you are in immediate danger and can get a signal, call 112."
+  ]
 };
 
-let dataUrl = null;
+let dataUrl = null, lastBytes = 0;
 const $ = id => document.getElementById(id);
 
-fetch("/api/health").then(r=>r.json()).then(j=>{ if(j.mode==="live") $("liveTag").hidden=false; }).catch(()=>{});
+/* ============================================================
+   OFFLINE QUEUE
+   A flood cuts power and overloads cell sites. Reports are captured
+   locally in IndexedDB and flushed when a connection returns, so a
+   citizen never loses a report because the network chose that moment
+   to fail.
+   ============================================================ */
+const DB_NAME = "resilience-reports", STORE = "queue";
+function idb(){
+  return new Promise((res, rej)=>{
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = ()=>{
+      if(!r.result.objectStoreNames.contains(STORE))
+        r.result.createObjectStore(STORE, {keyPath:"id", autoIncrement:true});
+    };
+    r.onsuccess = ()=>res(r.result);
+    r.onerror = ()=>rej(r.error);
+  });
+}
+async function qAdd(rec){
+  const db = await idb();
+  return new Promise((res, rej)=>{
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).add(rec);
+    tx.oncomplete = res; tx.onerror = ()=>rej(tx.error);
+  });
+}
+async function qAll(){
+  const db = await idb();
+  return new Promise((res, rej)=>{
+    const tx = db.transaction(STORE, "readonly");
+    const rq = tx.objectStore(STORE).getAll();
+    rq.onsuccess = ()=>res(rq.result || []);
+    rq.onerror = ()=>rej(rq.error);
+  });
+}
+async function qDel(id){
+  const db = await idb();
+  return new Promise((res, rej)=>{
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = res; tx.onerror = ()=>rej(tx.error);
+  });
+}
+
+let BACKEND_LIVE = false;
+async function checkHealth(){
+  try{
+    const r = await fetch("/api/health", {cache:"no-store"});
+    const j = await r.json();
+    BACKEND_LIVE = j.mode === "live";
+    $("liveTag").hidden = !BACKEND_LIVE;
+  }catch(e){ BACKEND_LIVE = false; $("liveTag").hidden = true; }
+  paintNet();
+}
+
+async function paintNet(){
+  const bar = $("netbar");
+  const pending = (await qAll().catch(()=>[])).length;
+  const tag = $("liveTag");
+  if(!navigator.onLine){
+    tag.hidden = false; tag.className = "live-tag off";
+    tag.innerHTML = '<span class="live-dot"></span>Offline';
+    bar.hidden = false; bar.className = "netbar offline";
+    bar.innerHTML = `<b>You are offline.</b> You can still report — it will be saved on your phone and sent automatically when you have signal.${pending?` <b>${pending} waiting.</b>`:""}`;
+    return;
+  }
+  tag.className = "live-tag";
+  tag.innerHTML = '<span class="live-dot"></span>Live';
+  tag.hidden = !BACKEND_LIVE;
+  if(pending){
+    bar.hidden = false; bar.className = "netbar queued";
+    bar.innerHTML = `<b>${pending} saved report${pending>1?"s":""}</b> waiting to send — sending now…`;
+  } else {
+    bar.hidden = true;
+  }
+}
+
+/* Connection-aware compression. On a congested or 2G network a 400 KB photo
+   simply will not go through, so we trade resolution for delivery. */
+function bandwidthTier(){
+  if($("lowBand") && $("lowBand").checked) return {max:720, q:0.45, label:"low-bandwidth"};
+  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if(c){
+    if(c.saveData) return {max:720, q:0.45, label:"data saver"};
+    const t = c.effectiveType || "";
+    if(t.indexOf("2g") >= 0) return {max:640, q:0.4, label:"2G detected"};
+    if(t === "3g") return {max:1000, q:0.6, label:"3G detected"};
+  }
+  return {max:1600, q:0.85, label:"good connection"};
+}
+function b64Bytes(dataUrl){
+  const i = dataUrl.indexOf(",");
+  if(i < 0) return 0;
+  return Math.round((dataUrl.length - i - 1) * 3 / 4);
+}
+function fmtBytes(n){
+  return n >= 1048576 ? (n/1048576).toFixed(1)+" MB" : Math.max(1, Math.round(n/1024))+" KB";
+}
+
+navigator.serviceWorker && navigator.serviceWorker.register("/sw.js").catch(()=>{});
+navigator.serviceWorker && navigator.serviceWorker.addEventListener("message", e=>{
+  if(e.data && e.data.type === "flush-reports") flushQueue();
+});
+window.addEventListener("online", ()=>{ checkHealth().then(flushQueue); });
+window.addEventListener("offline", paintNet);
+checkHealth().then(flushQueue);
 
 $("dz").addEventListener("click", ()=>$("photo").click());
 $("dz").addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();$("photo").click();} });
+let __rawPhoto = null;
+function preparePhoto(){
+  if(!__rawPhoto) return;
+  const tier = bandwidthTier();
+  const img = new Image();
+  img.onload = ()=>{
+    const sc = Math.min(1, tier.max/Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(img.width*sc));
+    c.height = Math.max(1, Math.round(img.height*sc));
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    dataUrl = c.toDataURL("image/jpeg", tier.q);
+    lastBytes = b64Bytes(dataUrl);
+    $("preview").src = dataUrl; $("preview").hidden = false;
+    $("sizeHint").innerHTML = `Photo ready: <b>${fmtBytes(lastBytes)}</b> · ${c.width}×${c.height} · ${tier.label}`;
+    setMsg("");
+  };
+  img.onerror = ()=>setMsg("Could not read that photo.", true);
+  img.src = __rawPhoto;
+}
 $("photo").addEventListener("change", ()=>{
   const f = $("photo").files && $("photo").files[0];
   if(!f) return;
   if(!/^image\//.test(f.type)){ setMsg("Please choose a photo.", true); return; }
   const fr = new FileReader();
-  fr.onload = ()=>{
-    const img = new Image();
-    img.onload = ()=>{
-      const MAX = 1600;
-      const sc = Math.min(1, MAX/Math.max(img.width, img.height));
-      if(sc < 1 || f.size > 1500000){
-        const c = document.createElement("canvas");
-        c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
-        c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-        dataUrl = c.toDataURL("image/jpeg", 0.85);
-      } else { dataUrl = fr.result; }
-      $("preview").src = dataUrl; $("preview").hidden = false;
-      setMsg("");
-    };
-    img.onerror = ()=>setMsg("Could not read that photo.", true);
-    img.src = fr.result;
-  };
+  fr.onload = ()=>{ __rawPhoto = fr.result; preparePhoto(); };
+  fr.onerror = ()=>setMsg("Could not read that file.", true);
   fr.readAsDataURL(f);
 });
+$("lowBand").addEventListener("change", preparePhoto);
 
 function setMsg(t, err){ const m=$("msg"); m.textContent=t; m.className="msg"+(err?" err":""); }
 
@@ -169,36 +303,91 @@ function makeThumb(src, max){
   });
 }
 
+function showResult(j, opts){
+  opts = opts || {};
+  const sev = RISK_COLOR[j.severity] ? j.severity : "MODERATE";
+  const c = RISK_COLOR[sev];
+  $("resBadge").textContent = opts.queued ? "SAVED" : sev;
+  const bc = opts.queued ? "#38bdf8" : c;
+  $("resBadge").style.cssText = `background:${bc}22;color:${bc};border:1px solid ${bc}55`;
+  $("resType").textContent = opts.queued
+    ? "Waiting for signal · will be analysed automatically"
+    : (TYPE_LABEL[j.type]||"Report") + " · AI confidence " + (j.confidence||75) + "%";
+  $("resSum").textContent = opts.queued
+    ? "Your report is saved on this phone. As soon as you have a signal it will be sent to Delta City flood operations and analysed — you do not need to do anything."
+    : (j.summary || "Your report has been classified and queued for an operator.");
+  const list = opts.queued ? ADVICE.OFFLINE : (ADVICE[sev] || ADVICE.LOW);
+  $("advice").innerHTML = "<b>What you should do</b><ul>" + list.map(a=>"<li>"+a+"</li>").join("") + "</ul>"
+    + (opts.queued ? `<div class="queued-note">Saved without a network — ${fmtBytes(opts.bytes||0)} stored on your phone. Keep this page installed and it will send itself.</div>` : "");
+  $("formCard").style.display = "none";
+  $("resultCard").classList.add("show");
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+function buildPayload(thumb){
+  const m = dataUrl.match(/^data:([^;,]+)(?:;base64)?,(.*)$/);
+  return {
+    imageBase64: (m && /;base64/.test(dataUrl)) ? m[2] : "",
+    mimeType: m ? m[1] : "image/jpeg",
+    note: $("note").value.trim(),
+    district: $("district").value || "Citizen submission",
+    thumbnail: thumb,
+    source: "citizen-app"
+  };
+}
+
+async function flushQueue(){
+  if(!navigator.onLine) return;
+  const items = await qAll().catch(()=>[]);
+  if(!items.length){ paintNet(); return; }
+  await paintNet();
+  let sent = 0;
+  for(const it of items){
+    try{
+      const res = await fetch("/api/triage", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(it.body)});
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      await qDel(it.id);
+      sent++;
+    }catch(e){ break; }   // still unreachable — leave the rest queued
+  }
+  if(sent){
+    const bar = $("netbar");
+    bar.hidden = false; bar.className = "netbar queued";
+    bar.innerHTML = `<b>${sent} saved report${sent>1?"s":""} sent</b> — now with Delta City flood operations.`;
+    setTimeout(paintNet, 6000);
+  } else {
+    paintNet();
+  }
+}
+
 $("sendBtn").addEventListener("click", async ()=>{
   if(!dataUrl){ setMsg("Add a photo first — tap the camera box.", true); return; }
   const btn = $("sendBtn");
-  btn.disabled = true; btn.textContent = "Analyzing your report…";
+  btn.disabled = true; btn.textContent = "Sending…";
   setMsg("");
+  const thumb = await makeThumb(dataUrl);
+  const body = buildPayload(thumb);
+  const queueIt = async ()=>{
+    await qAdd({body, ts:Date.now()});
+    if(navigator.serviceWorker && "SyncManager" in window){
+      try{
+        const reg = await navigator.serviceWorker.ready;
+        await reg.sync.register("flush-reports");
+      }catch(e){ /* browser without background sync — the online listener covers it */ }
+    }
+    showResult({}, {queued:true, bytes:lastBytes});
+    paintNet();
+  };
   try{
-    const m = dataUrl.match(/^data:([^;,]+)(?:;base64)?,(.*)$/);
-    const body = {
-      imageBase64: (m && /;base64/.test(dataUrl)) ? m[2] : "",
-      mimeType: m ? m[1] : "image/jpeg",
-      note: $("note").value.trim(),
-      district: $("district").value || "Citizen submission",
-      thumbnail: await makeThumb(dataUrl),
-      source: "citizen-app"
-    };
+    if(!navigator.onLine) { await queueIt(); return; }
+    btn.textContent = "Analyzing your report…";
     const res = await fetch("/api/triage", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
     if(!res.ok){ const t = await res.text(); throw new Error("HTTP "+res.status+" "+t.slice(0,80)); }
-    const j = await res.json();
-    const sev = RISK_COLOR[j.severity] ? j.severity : "MODERATE";
-    const c = RISK_COLOR[sev];
-    $("resBadge").textContent = sev;
-    $("resBadge").style.cssText = `background:${c}22;color:${c};border:1px solid ${c}55`;
-    $("resType").textContent = (TYPE_LABEL[j.type]||"Report") + " · AI confidence " + (j.confidence||75) + "%";
-    $("resSum").textContent = j.summary || "Your report has been classified and queued for an operator.";
-    $("advice").innerHTML = "<b>What you should do</b><ul>" + (ADVICE[sev]||ADVICE.LOW).map(a=>"<li>"+a+"</li>").join("") + "</ul>";
-    $("formCard").style.display = "none";
-    $("resultCard").classList.add("show");
-    window.scrollTo({top:0, behavior:"smooth"});
+    showResult(await res.json());
   }catch(err){
-    setMsg("Could not send right now ("+String(err.message||err).slice(0,60)+"). Please try again.", true);
+    // Network died mid-submit — never lose the report.
+    try{ await queueIt(); }
+    catch(e2){ setMsg("Could not save the report on this device. Please try again.", true); }
   }finally{
     btn.disabled = false;
     btn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Send report';
@@ -206,11 +395,12 @@ $("sendBtn").addEventListener("click", async ()=>{
 });
 
 $("againBtn").addEventListener("click", ()=>{
-  dataUrl = null;
+  dataUrl = null; __rawPhoto = null; lastBytes = 0;
   $("preview").hidden = true; $("preview").removeAttribute("src");
-  $("photo").value = ""; $("note").value = "";
+  $("photo").value = ""; $("note").value = ""; $("sizeHint").textContent = "";
   $("resultCard").classList.remove("show");
   $("formCard").style.display = "";
+  paintNet();
   window.scrollTo({top:0});
 });
 </script>

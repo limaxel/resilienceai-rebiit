@@ -13,6 +13,8 @@ submission.md
 # Build copies (synced from prototype/ at deploy time)
 deploy/index.html
 deploy/report.html
+deploy/sw.js
+deploy/manifest.webmanifest
 
 # Local tooling
 .claude/

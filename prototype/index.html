@@ -220,6 +220,18 @@ button{font-family:inherit}
 .bubble ol,.bubble ul{margin:6px 0 9px;padding-left:20px}
 .bubble li{margin-bottom:5px}
 .bubble strong{color:#fff}
+.comms-alert{display:flex;align-items:flex-start;gap:13px;background:linear-gradient(90deg,rgba(100,116,139,0.18),rgba(148,163,184,0.09));border:1px solid rgba(148,163,184,0.42);border-left:4px solid #94a3b8;border-radius:12px;padding:13px 16px;margin-bottom:16px}
+.ca-icon{color:#cbd5e1;flex:none;margin-top:1px}
+.ca-title{font-size:13px;font-weight:800;letter-spacing:.05em;color:#e2e8f0;margin-bottom:4px}
+.ca-text{font-size:12.5px;color:var(--muted);line-height:1.5}
+.ca-text b{color:#e2e8f0}
+.ca-btn{flex:none;align-self:center;padding:7px 13px;border-radius:9px;border:1px solid rgba(148,163,184,0.4);background:transparent;color:#cbd5e1;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.ca-btn:hover{background:rgba(148,163,184,0.14)}
+.drill-btn{padding:7px 12px;border-radius:9px;border:1px solid rgba(148,163,184,0.3);background:var(--panel-2);color:var(--muted);font:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
+.drill-btn:hover{color:#e2e8f0;border-color:rgba(148,163,184,0.5)}
+.degraded-banner{display:flex;align-items:flex-start;gap:12px;background:rgba(234,179,8,0.09);border:1px solid rgba(234,179,8,0.4);border-left:4px solid #eab308;border-radius:12px;padding:12px 15px;margin-bottom:14px}
+.deg-title{font-size:12.5px;font-weight:800;letter-spacing:.05em;color:#f0cf5e;margin-bottom:3px}
+.deg-text{font-size:12px;color:var(--muted);line-height:1.5}
 .bubble em{color:#cfe0f5;font-style:italic}
 .bubble code{background:rgba(148,163,184,0.16);border-radius:4px;padding:1px 5px;font-size:12.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .risk-inline{font-weight:700;padding:1px 6px;border-radius:4px;font-size:11.5px;letter-spacing:.03em}
@@ -430,8 +442,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
       <span class="tag"><b>42</b> IoT gauges · simulated</span>
       <span class="tag"><b>Gemini 2.5</b> on Vertex AI · live</span>
       <span class="tag">Last sync <b id="syncTime">now</b></span>
+      <button class="drill-btn" id="blackoutDrillBtn" style="display:none" title="Simulate losing a district's cell site and power">▲ Run comms-blackout drill</button>
     </div>
   </div>
+
+  <div id="commsAlert"></div>
 
   <div class="kpi-row" id="kpiRow"></div>
 
@@ -697,7 +712,9 @@ async function refreshState(){
     });
     (STATE.sensors||[]).forEach(ss=>{
       const s = SENSOR_POOL.find(x=>x.id===ss.id);
-      if(s) s.base = ss.val;
+      if(!s) return;
+      s.offline = ss.status === "NO SIGNAL";
+      if(!s.offline && ss.val !== null) s.base = ss.val;
     });
     renderCtxPanel();
     if(curView==="dashboard") renderDashboard();
@@ -723,6 +740,18 @@ async function refreshWeather(){
   }catch(e){}
 }
 function isLive(){ return BACKEND || !!getKey(); }
+
+/* ---------- Comms resilience ----------
+   A flood takes out power and cell sites. When a district stops reporting we
+   treat that silence as escalation, not reassurance — the same doctrine real
+   emergency operations centers use. */
+function blackoutFor(id){
+  if(!STATE || !STATE.comms) return null;
+  return (STATE.comms.blackouts||[]).find(b=>b.id===id) || null;
+}
+function silentLabel(m){ return m ? m+" min" : "<1 min"; }
+function isBlackout(id){ return !!blackoutFor(id); }
+function blackoutList(){ return (STATE && STATE.comms && STATE.comms.blackouts) || []; }
 
 /* ---------- District model ---------- */
 // baseVuln/riverExp/coastalExp/centerExp drive the risk formula.
@@ -808,11 +837,16 @@ function buildMap(rain, track, tooltipEl){
     <rect x="0" y="0" width="812" height="512" fill="#0a1322" rx="10"/>`;
   // coastline hint on right/bottom
   html += `<path d="M772,206 L800,206 L800,482 L570,482" fill="none" stroke="rgba(56,189,248,0.18)" stroke-width="2" stroke-dasharray="3 5"/>`;
+  html += `<pattern id="blackoutHatch_${uid}" width="10" height="10" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+    <rect width="10" height="10" fill="#1c2434"/>
+    <line x1="0" y1="0" x2="0" y2="10" stroke="#64748b" stroke-width="3.5" opacity="0.55"/>
+  </pattern>`;
   DISTRICTS.forEach(d=>{
     const risk = districtRisk(d, rain, track);
     const c = RISK[risk].color;
+    const dark = isBlackout(d.id);
     html += `<polygon class="district" data-id="${d.id}" points="${MAP_POLY[d.id]}"
-      fill="${c}" fill-opacity="0.72" stroke="#0a1322" stroke-width="2.5" filter="url(#${shadowId})"/>`;
+      fill="${dark?`url(#blackoutHatch_${uid})`:c}" fill-opacity="${dark?1:0.72}" stroke="${dark?"#94a3b8":"#0a1322"}" stroke-width="2.5" ${dark?'stroke-dasharray="7 4"':''} filter="url(#${shadowId})"/>`;
   });
   // river on top
   html += `<path d="${RIVER_PATH}" fill="none" stroke="url(#${gradId})" stroke-width="16" stroke-linecap="round"/>`;
@@ -821,7 +855,13 @@ function buildMap(rain, track, tooltipEl){
   DISTRICTS.forEach(d=>{
     const L=MAP_LABELS[d.id];
     html += `<text class="district-label" x="${L.x}" y="${L.y}" text-anchor="middle">${d.name.replace("Central Business District","CBD")}</text>`;
-    html += `<text class="district-sub" x="${L.x}" y="${L.y+15}" text-anchor="middle">${L.sub}</text>`;
+    const bo = blackoutFor(d.id);
+    if(bo){
+      html += `<text class="district-sub" x="${L.x}" y="${L.y+15}" text-anchor="middle" fill="#e2e8f0" font-weight="700">NO DATA · ${silentLabel(bo.silentMin)}</text>`;
+      html += `<text class="district-sub" x="${L.x}" y="${L.y+30}" text-anchor="middle" fill="#cbd5e1">${L.sub} unobserved</text>`;
+    } else {
+      html += `<text class="district-sub" x="${L.x}" y="${L.y+15}" text-anchor="middle">${L.sub}</text>`;
+    }
   });
   html += `</svg>`;
   const mount = document.createElement("div");
@@ -833,8 +873,16 @@ function buildMap(rain, track, tooltipEl){
     poly.addEventListener("mousemove", e=>{
       const risk = districtRisk(d, rain, track);
       const c = RISK[risk].color;
-      tooltipEl.innerHTML =
-        `<div class="mt-name">${d.name}</div>
+      const bo = blackoutFor(d.id);
+      tooltipEl.innerHTML = bo
+        ? `<div class="mt-name">${d.name}</div>
+         <div class="mt-risk" style="background:rgba(148,163,184,0.22);color:#e2e8f0">COMMS BLACKOUT</div>
+         <div class="mt-row"><span>Silent for</span><b>${silentLabel(bo.silentMin)}</b></div>
+         <div class="mt-row"><span>Unobserved</span><b>${fmtNum(d.pop)} people</b></div>
+         <div class="mt-row"><span>Last known risk</span><b style="color:${RISK[bo.lastRisk]?RISK[bo.lastRisk].color:'#e2e8f0'}">${bo.lastRisk} · stale</b></div>
+         <div class="mt-row"><span>Last gauge</span><b>${d.gauge.toFixed(1)} m · stale</b></div>
+         <div style="margin-top:8px;font-size:11px;color:#f0cf5e;line-height:1.45">Assume conditions worse than last observed. Field team required for eyes-on.</div>`
+        : `<div class="mt-name">${d.name}</div>
          <div class="mt-risk" style="background:${c}22;color:${c}">${risk} RISK</div>
          <div class="mt-row"><span>Population</span><b>${fmtNum(d.pop)}</b></div>
          <div class="mt-row"><span>River gauge</span><b>${d.gauge.toFixed(1)} m ▲${d.gaugeChg}</b></div>
@@ -965,6 +1013,7 @@ function buildKPIs(){
   const atRisk = k ? k.popAtRisk : DISTRICTS.filter(d=>{const r=districtRisk(d,180,"riverine");return r==="HIGH"||r==="MODERATE"||r==="SEVERE";}).reduce((a,d)=>a+d.pop,0);
   const alerts = k ? k.alerts : 7, aHigh = k ? k.alertsHigh : 2, aMod = k ? k.alertsMod : 5;
   const sOn = k ? k.sensorsOnline : 40, sTot = k ? k.sensorsTotal : 42;
+  const unreachable = (k && k.sensorsUnreachable) || 0, faulty = (k && k.sensorsFaulty) || 2;
   const shOpen = k ? k.shelterOpen : 18400, shTot = k ? k.shelterTotal : 30000, shAct = k ? k.sheltersActive : 12;
   const shPct = Math.round(shOpen/shTot*100);
   const tiles = [
@@ -972,8 +1021,11 @@ function buildKPIs(){
       delta:`<span class="up">▲ +180k</span> vs 24h ago · in HIGH/MODERATE zones`, track:null},
     {cls:"k-accent-mod", label:"Active alerts", val:""+alerts, unit:"", icon:iconBell("#eab308"),
       delta:`<span class="up">▲ 3 new</span> · ${aHigh} HIGH · ${aMod} MODERATE`, track:null},
-    {cls:"k-accent-low", label:"Sensors online", val:""+sOn, unit:"/ "+sTot, icon:iconActivity("#22c55e"),
-      delta:`${Math.round(sOn/sTot*100)}% uptime · 2 gauges offline in Eastgate`, track:{pct:Math.round(sOn/sTot*100),color:"#22c55e"}},
+    {cls:"k-accent-low", label:"Sensors online", val:""+sOn, unit:"/ "+sTot, icon:iconActivity(unreachable?"#94a3b8":"#22c55e"),
+      delta: unreachable
+        ? `<span class="up">▼ ${unreachable} unreachable</span> in ${(k.blackoutNames||[]).map(escapeHtml).join(", ")} · ${faulty} faulty in Eastgate`
+        : `${Math.round(sOn/sTot*100)}% uptime · ${faulty} gauges offline in Eastgate`,
+      track:{pct:Math.round(sOn/sTot*100),color:unreachable?"#94a3b8":"#22c55e"}},
     {cls:"k-accent-accent", label:"Shelter capacity", val:fmtNum(shOpen), unit:"open", icon:iconHome("#38bdf8"),
       delta:`${shAct} shelters active · ${shPct}% of ${fmtNum(shTot)} free`, track:{pct:100-shPct,color:"#38bdf8"}}
   ];
@@ -1009,6 +1061,15 @@ const SENSOR_POOL = [
   {id:"HLW-02", name:"Hillside West · runoff", base:1.8, unit:"m", type:"river"}
 ];
 function tickerRow(s){
+  if(s.offline){
+    return `<div class="ticker-row" style="opacity:.75">
+      <span class="sensor-id">${s.id}</span>
+      <span class="sensor-name">${s.name}</span>
+      <span class="sensor-val" style="color:#94a3b8">— —</span>
+      <span class="sensor-val" style="color:#94a3b8">—</span>
+      <span class="chip-status" style="background:rgba(148,163,184,0.18);color:#cbd5e1">NO SIGNAL</span>
+    </div>`;
+  }
   const jitter = (Math.random()-0.4)*(s.type==="rain"?3:0.15);
   const val = (s.base + jitter);
   const rising = jitter>0.02;
@@ -1155,9 +1216,10 @@ function buildActionsFrom(list){
           <div class="ac-metrics">
             <div class="ac-metric"><span class="m-label">Priority risk</span><span class="m-val" style="color:${c}">${a.risk}</span></div>
             <div class="ac-metric"><span class="m-label">Population impact</span><span class="m-val">${a.pop}</span></div>
-            <div class="ac-metric"><span class="m-label">Model confidence</span>
+            ${a.conf ? `<div class="ac-metric"><span class="m-label">Model confidence</span>
               <span class="conf-wrap"><span class="conf-bar2"><span style="width:${a.conf}%;background:${a.conf>=88?'#22c55e':a.conf>=80?'#eab308':'#f97316'}"></span></span><b class="m-val" style="font-size:13px">${a.conf}%</b></span>
-            </div>
+            </div>`
+            : `<div class="ac-metric"><span class="m-label">Source</span><span class="m-val" style="font-size:13px;color:#f0cf5e">Rule-based triage</span></div>`}
           </div>
           <button class="ac-explain-btn" data-idx="${i}">Explain reasoning <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
@@ -1196,8 +1258,17 @@ async function regenPlan(scenario){
       <b>Generated live by Gemini on Vertex AI</b> · ${isBase?"current baseline":"what-if scenario: "+sc.rain+" mm · "+escapeHtml(sc.track)+" track"} · grounded on live state + citizen reports · ${when}</div>`
       + buildActionsFrom(j.actions);
   }catch(err){
-    mount.innerHTML = `<div class="plan-banner" style="border:1px solid rgba(234,179,8,0.4);background:rgba(234,179,8,0.08);color:#f0cf5e;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:4px">
-      ⚠ Live planning failed (${escapeHtml(String(err.message||err).slice(0,90))}) — showing the baseline plan.</div>` + buildActions();
+    // Degraded mode: serve the server's deterministic triage, clearly labelled.
+    let ruleActions = null;
+    try{
+      const r = await fetch("/api/fallback-plan", {cache:"no-store"});
+      if(r.ok){ const rj = await r.json(); ruleActions = rj.actions; }
+    }catch(e){}
+    mount.innerHTML = `<div class="degraded-banner">
+        <div style="color:#eab308;flex:none">⚠</div>
+        <div><div class="deg-title">DEGRADED MODE — AI LAYER UNAVAILABLE</div>
+        <div class="deg-text">Live planning failed (${escapeHtml(String(err.message||err).slice(0,80))}). The plan below is <b>rule-based triage, not AI-generated</b> — ranked deterministically by risk, population and comms status so the command center still functions.</div></div>
+      </div>` + (ruleActions && ruleActions.length ? buildActionsFrom(ruleActions) : buildActions());
   }finally{
     planBusy = false;
     if(btn){ btn.disabled = false; }
@@ -1333,8 +1404,10 @@ async function askCopilot(q){
       addMsg("ai", mdToHtml(escapeHtml(ans)) + `<div class="cite-row">${cites}</div>`);
       return;
     }catch(err){
+      // The AI layer is unreachable. Never dress canned text up as an AI answer —
+      // say so, and fall back to a deterministic answer computed from live state.
       if(typing) typing.remove();
-      addMsg("ai", `<p style="color:#f0cf5e">⚠ Live call failed (${escapeHtml(String(err.message||err))}). Falling back to demo mode.</p>`+demoAnswer(q));
+      addMsg("ai", degradedAnswer(q, String(err.message||err)));
       return;
     }
   }
@@ -1350,6 +1423,31 @@ async function callBackendChat(q){
   const j = await res.json();
   if(!j || !j.text) throw new Error("empty response");
   return {text:String(j.text).trim(), trace:j.trace||[], agents:j.agents||null};
+}
+/* ---------- Degraded mode ----------
+   When Vertex AI is unreachable the command center must still work. We compute a
+   deterministic answer from the live city state and label it clearly as not-AI,
+   because a canned paragraph presented as intelligence is worse than no answer. */
+function degradedAnswer(q, why){
+  const ds = DISTRICTS.map(d=>({d, s:riskScore(d,180,"riverine"), r:districtRisk(d,180,"riverine")}))
+    .sort((a,b)=>b.s-a.s);
+  const k = (STATE && STATE.kpis) || {};
+  const shelter = k.shelterOpen || 18400;
+  const bo = blackoutList();
+  const top = ds.filter(x=>x.r==="SEVERE"||x.r==="HIGH");
+  const rows = (top.length?top:ds.slice(0,3)).map(x=>
+    `<li><strong>${escapeHtml(x.d.name)}</strong> ${riskTag(x.r)} — gauge ${x.d.gauge.toFixed(2)}m, ${fmtNum(x.d.pop)} residents${isBlackout(x.d.id)?' <b style="color:#e2e8f0">· COMMS BLACKOUT, data stale</b>':''}</li>`).join("");
+  const evacPop = top.reduce((a,x)=>a+Math.round(x.d.pop*0.41),0);
+  return `<div class="degraded-banner">
+      <div style="color:#eab308;flex:none">⚠</div>
+      <div><div class="deg-title">DEGRADED MODE — AI LAYER UNAVAILABLE</div>
+      <div class="deg-text">This answer was <b>not</b> generated by Gemini (${escapeHtml((why||"").slice(0,70))}). It is a deterministic rule-based readout of live city state, so the command center keeps working during an outage.</div></div>
+    </div>
+    <p><strong>Priority order by risk × population</strong> (rule-based):</p>
+    <ol>${rows}</ol>
+    <p>Estimated floodplain evacuation demand ${fmtNum(evacPop)} against <strong>${fmtNum(shelter)}</strong> open shelter spaces — ${evacPop>shelter?'<strong style="color:#f39898">insufficient, activate reserve shelters</strong>':'within capacity'}.</p>
+    ${bo.length?`<p><strong style="color:#e2e8f0">${bo.map(b=>escapeHtml(b.name)).join(", ")} silent ${bo.map(b=>silentLabel(b.silentMin)).join(", ")}</strong> — treat as escalation and dispatch a field team; do not assume safe.</p>`:""}
+    <div class="cite-row"><span class="cite">rule-based · no model call</span><span class="cite">live city state</span></div>`;
 }
 function demoAnswer(q){
   const match = DEMO_QA.find(p=>p.q.toLowerCase()===q.toLowerCase())
@@ -1836,7 +1934,34 @@ function go(view){
   if(view==="scenario") renderScenario();
 }
 let dashboardRendered=false, copilotSeeded=false;
+function renderCommsAlert(){
+  const el = document.getElementById("commsAlert");
+  if(!el) return;
+  const bo = blackoutList();
+  const drill = document.getElementById("blackoutDrillBtn");
+  if(drill) drill.textContent = bo.length ? "● Restore comms" : "▲ Run comms-blackout drill";
+  if(!bo.length){ el.innerHTML=""; return; }
+  const total = bo.reduce((a,b)=>a+b.pop,0);
+  el.innerHTML = `<div class="comms-alert">
+    <div class="ca-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></div>
+    <div class="ca-body">
+      <div class="ca-title">COMMS BLACKOUT — ${bo.map(b=>escapeHtml(b.name)).join(", ")}</div>
+      <div class="ca-text">No sensor or citizen data for <b>${bo.map(b=>silentLabel(b.silentMin)).join(", ")}</b> · <b>${fmtNum(total)}</b> residents now unobserved. Last readings are stale. <b>Silence is treated as escalation, not reassurance</b> — assume conditions are worse than last observed until a field team confirms.</div>
+    </div>
+    <button class="ca-btn" id="restoreCommsBtn">Restore comms</button>
+  </div>`;
+  const rb = document.getElementById("restoreCommsBtn");
+  if(rb) rb.addEventListener("click", ()=>setBlackout(bo[0].id, false));
+}
+async function setBlackout(district, on){
+  try{
+    await fetch("/api/comms",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({district, on, cause:"cell site down, power loss"})});
+    await refreshState();
+  }catch(e){}
+}
 function renderDashboard(){
+  renderCommsAlert();
   document.getElementById("kpiRow").innerHTML=buildKPIs();
   const mapMount=document.getElementById("mapMount");
   mapMount.innerHTML="";
@@ -1876,6 +2001,12 @@ function wireActions(){
   });
   const rb=document.getElementById("regenPlanBtn");
   if(rb) rb.addEventListener("click",()=>regenPlan({rain:180,track:"riverine"}));
+  const bd=document.getElementById("blackoutDrillBtn");
+  if(bd) bd.addEventListener("click",()=>{
+    const bo=blackoutList();
+    if(bo.length) setBlackout(bo[0].id,false);
+    else setBlackout("kampung",true);
+  });
   const sb=document.getElementById("scenarioPlanBtn");
   if(sb) sb.addEventListener("click",()=>{ const sc={rain:scRain,track:scTrack}; go("actions"); regenPlan(sc); });
 }
@@ -1894,6 +2025,8 @@ function refreshMode(){
     const b=document.getElementById(id);
     if(b) b.style.display = BACKEND ? "inline-flex" : "none";
   });
+  const db=document.getElementById("blackoutDrillBtn");
+  if(db) db.style.display = BACKEND ? "inline-block" : "none";
   const ms=document.getElementById("modalModeStatus");
   if(ms){
     if(BACKEND){ms.style.cssText="background:rgba(34,197,94,0.12);color:#7fe6a5;border:1px solid rgba(34,197,94,0.3)";ms.innerHTML="● Connected to ResilienceAI backend (key managed server-side).";}

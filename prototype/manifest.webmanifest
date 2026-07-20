@@ -1,0 +1,19 @@
+{
+  "name": "ResilienceAlert — Delta City",
+  "short_name": "ResilienceAlert",
+  "description": "Report flooding and hazards to Delta City flood operations. Works offline.",
+  "start_url": "/report",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a1322",
+  "theme_color": "#0a1322",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%230a1322'/%3E%3Cpath d='M96 24c32 16 56 20 72 20 0 64-24 108-72 128-48-20-72-64-72-128 16 0 40-4 72-20z' fill='%2338bdf8' fill-opacity='0.18' stroke='%2338bdf8' stroke-width='8'/%3E%3Cpath d='M44 100c13 0 13-12 26-12s13 12 26 12 13-12 26-12 13 12 26 12' stroke='%2338bdf8' stroke-width='10' stroke-linecap='round' fill='none'/%3E%3Cpath d='M44 124c13 0 13-12 26-12s13 12 26 12 13-12 26-12 13 12 26 12' stroke='%23818cf8' stroke-width='10' stroke-linecap='round' fill='none' opacity='0.75'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

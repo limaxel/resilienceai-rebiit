@@ -56,6 +56,18 @@ def gclient():
     return _client
 
 
+# Tracks whether the model layer is answering, so the UI can say so honestly
+# rather than silently serving canned text as if it were AI.
+_ai_health = {"ok": True, "last_error": "", "last_fail": 0.0}
+
+
+def note_ai(ok, err=""):
+    _ai_health["ok"] = ok
+    if not ok:
+        _ai_health["last_error"] = str(err)[:200]
+        _ai_health["last_fail"] = time.time()
+
+
 def generate(contents, system=None, temp=0.4, max_tokens=2048,
              json_mode=False, no_thinking=False):
     cfg = types.GenerateContentConfig(temperature=temp, max_output_tokens=max_tokens)
@@ -65,10 +77,16 @@ def generate(contents, system=None, temp=0.4, max_tokens=2048,
         cfg.response_mime_type = "application/json"
     if no_thinking:
         cfg.thinking_config = types.ThinkingConfig(thinking_budget=0)
-    resp = gclient().models.generate_content(model=MODEL, contents=contents, config=cfg)
+    try:
+        resp = gclient().models.generate_content(model=MODEL, contents=contents, config=cfg)
+    except Exception as exc:
+        note_ai(False, exc)
+        raise
     text = (resp.text or "").strip()
     if not text:
+        note_ai(False, "empty response")
         raise RuntimeError("empty Gemini response")
+    note_ai(True)
     return text
 
 
@@ -102,6 +120,28 @@ def store_report(doc):
         return ref.id
     except Exception:
         return None
+
+
+def get_ops_doc(name, default=None):
+    db = fsdb()
+    if not db:
+        return default
+    try:
+        snap = db.collection("ops").document(name).get()
+        return snap.to_dict() if snap.exists else default
+    except Exception:
+        return default
+
+
+def set_ops_doc(name, data):
+    db = fsdb()
+    if not db:
+        return False
+    try:
+        db.collection("ops").document(name).set(data)
+        return True
+    except Exception:
+        return False
 
 
 def recent_reports(limit=20):
@@ -201,20 +241,73 @@ def wobble(seed, t, period, amp):
     return amp * math.sin(2 * math.pi * t / period + phase)
 
 
+# ---------------------------------------------------------------- Comms resilience
+# A flood takes out power and cell sites. When a district stops reporting, that
+# silence is treated as escalation, not reassurance — the doctrine real emergency
+# operations centers use. Blackout state lives in Firestore so every instance and
+# every viewer sees the same picture.
+_blackout_cache = {"t": 0.0, "data": None}
+_blackout_mem = {}   # fallback when Firestore is unavailable (local dev)
+BLACKOUT_TTL = 5.0
+# Eastgate ships with 2 offline gauges in the baseline scenario.
+PARTIAL_DEGRADED = {"eastgate": 2}
+# Gauges per district — sums to the 42-gauge network quoted across the product.
+SENSOR_COUNTS = {"riverside": 7, "oldquarter": 5, "harbor": 6, "kampung": 6,
+                 "cbd": 4, "hillside": 4, "eastgate": 5, "southbank": 5}
+
+
+def blackout_state():
+    if _blackout_cache["data"] is not None and time.time() - _blackout_cache["t"] < BLACKOUT_TTL:
+        return _blackout_cache["data"]
+    doc = get_ops_doc("comms")
+    data = (doc or {}).get("blackouts") if doc else None
+    if data is None:
+        data = _blackout_mem
+    _blackout_cache.update(t=time.time(), data=data)
+    return data
+
+
+def comms_for(district_id, t):
+    """Return (status, silent_minutes, note) for a district."""
+    bo = blackout_state().get(district_id)
+    if bo:
+        since = float(bo.get("since") or t)
+        return "blackout", max(0, int((t - since) / 60)), bo.get("cause", "no sensor or citizen traffic")
+    if district_id in PARTIAL_DEGRADED:
+        return "degraded", 0, f"{PARTIAL_DEGRADED[district_id]} gauges offline"
+    return "ok", 0, ""
+
+
 def city_state(t=None):
     t = t or time.time()
     districts = []
     for d in DISTRICTS:
         gauge = d["gauge"] + wobble(d["id"] + ":g", t, 10800, 0.09) + wobble(d["id"] + ":g2", t, 1400, 0.03)
         rain48 = d["rain"] + wobble(d["id"] + ":r", t, 7200, 6)
-        districts.append({
+        status, silent, note = comms_for(d["id"], t)
+        entry = {
             "id": d["id"], "name": d["name"], "pop": d["pop"],
             "gauge": round(gauge, 2), "gaugeChg": d["gaugeChg"],
             "rain48": int(round(rain48)),
             "risk": score_to_risk(risk_score(d, 180, "riverine")),
-        })
+            "comms": status, "silentMin": silent, "commsNote": note,
+        }
+        if status == "blackout":
+            # Last known values are stale — freeze them and flag the gap.
+            entry["stale"] = True
+        districts.append(entry)
+    blacked = {d["id"] for d in districts if d["comms"] == "blackout"}
+    sensor_district = {"RVN": "riverside", "KPB": "kampung", "SBK": "southbank",
+                       "OLQ": "oldquarter", "HBE": "harbor", "CBD": "cbd",
+                       "EGT": "eastgate", "HLW": "hillside"}
     sensors = []
     for s in SENSORS:
+        if sensor_district.get(s["id"][:3]) in blacked:
+            sensors.append({
+                "id": s["id"], "name": s["name"], "unit": s["unit"], "type": s["type"],
+                "val": None, "delta": 0, "status": "NO SIGNAL",
+            })
+            continue
         amp = 2.5 if s["type"] == "rain" else 0.08
         delta = wobble(s["id"] + ":d", t, 900, amp)
         val = s["base"] + wobble(s["id"] + ":v", t, 5400, amp * 1.6) + delta
@@ -235,13 +328,31 @@ def city_state(t=None):
     at_risk = sum(d["pop"] for d in districts if d["risk"] in ("MODERATE", "HIGH", "SEVERE"))
     alerts_mod = 5 + (1 if wobble("alerts", t, 6600, 1) > 0.55 else 0)
     shelter_open = 18400 - int(abs(wobble("shelter", t, 8400, 1)) * 350)
+    blackout_list = [d for d in districts if d["comms"] == "blackout"]
+    unreachable = sum(SENSOR_COUNTS.get(d["id"], 0) for d in blackout_list)
+    baseline_offline = sum(PARTIAL_DEGRADED.values())
     kpis = {
         "popAtRisk": at_risk,
-        "alerts": 2 + alerts_mod, "alertsHigh": 2, "alertsMod": alerts_mod,
-        "sensorsOnline": 40, "sensorsTotal": 42,
+        "alerts": 2 + alerts_mod + len(blackout_list),
+        "alertsHigh": 2 + len(blackout_list), "alertsMod": alerts_mod,
+        "sensorsOnline": 42 - baseline_offline - unreachable, "sensorsTotal": 42,
+        "sensorsUnreachable": unreachable, "sensorsFaulty": baseline_offline,
+        "blackoutNames": [d["name"] for d in blackout_list],
         "shelterOpen": shelter_open, "shelterTotal": 30000, "sheltersActive": 12,
+        "blackouts": len(blackout_list),
+        "popUnobserved": sum(d["pop"] for d in blackout_list),
     }
-    return {"t": int(t), "districts": districts, "sensors": sensors, "kpis": kpis}
+    return {"t": int(t), "districts": districts, "sensors": sensors, "kpis": kpis,
+            "comms": {
+                "blackouts": [{"id": d["id"], "name": d["name"], "pop": d["pop"],
+                               "silentMin": d["silentMin"], "lastRisk": d["risk"],
+                               "note": d["commsNote"]} for d in blackout_list],
+                "degraded": [{"id": d["id"], "name": d["name"], "note": d["commsNote"]}
+                             for d in districts if d["comms"] == "degraded"],
+                "doctrine": ("Loss of signal from a flood-exposed district is treated as "
+                             "escalation, not reassurance: assume conditions are worse than "
+                             "last observed until a field team confirms otherwise."),
+            }}
 
 
 # ---------------------------------------------------------------- Weather
@@ -298,6 +409,15 @@ def chat_context():
                         f"{w['total48']}mm real precipitation expected in the next 48h.")
     except Exception:
         pass
+    comms_line = ""
+    bo = st["comms"]["blackouts"]
+    if bo:
+        detail = "; ".join(f"{b['name']} (pop {b['pop']:,}, silent {b['silentMin']} min, "
+                           f"last known risk {b['lastRisk']}, {b['note']})" for b in bo)
+        comms_line = (f"\nCOMMS BLACKOUT — no sensor or citizen data from: {detail}. "
+                      f"{st['comms']['doctrine']} These districts are blind spots: their readings "
+                      f"are stale, they must not be described as safe, and they need a field team "
+                      f"for eyes-on confirmation.")
     return f"""You are the ResilienceAI Response Assistant for Delta City (pop 2.4M),
 a Southeast Asian river city during monsoon season. A tropical storm is approaching.
 Current district state (live):
@@ -306,8 +426,10 @@ Current district state (live):
 Sensors: {k['sensorsOnline']}/{k['sensorsTotal']} online (2 offline in Eastgate).
 Shelters: {k['sheltersActive']} active, {k['shelterOpen']:,} spaces open of {k['shelterTotal']:,}.
 {k['alerts']} active alerts ({k['alertsHigh']} HIGH, {k['alertsMod']} MODERATE).
-Population at risk (MODERATE or worse): {k['popAtRisk']:,}.{weather_line}
+Population at risk (MODERATE or worse): {k['popAtRisk']:,}.{weather_line}{comms_line}
 {ASSETS_CONTEXT}
+If a district is in a comms blackout, never call it safe: state that its data is stale, that
+conditions must be assumed worse than last observed, and that a field team is needed.
 Recent citizen reports:
 {reports_digest(5)}
 Answer as a concise, calm operations assistant: ground every answer in this data,
@@ -341,6 +463,11 @@ def get_weather_feed() -> dict:
 def get_response_assets() -> dict:
     """Available response assets: pumps, crews, rescue boats, buses, shelters (incl. reserves) and egress route status."""
     return {"assets": ASSETS_CONTEXT}
+
+
+def get_comms_status() -> dict:
+    """Communications status per district: which districts have lost all sensor and citizen data (comms blackout), how long they have been silent, and the operational doctrine for handling that silence. Call this before assessing risk — a silent district is a blind spot, not a safe one."""
+    return city_state()["comms"]
 
 
 _adk = {"runner": None, "failed": False}
@@ -385,8 +512,12 @@ def adk_runner():
             instruction=("You are the ResilienceAI Response Assistant for Delta City (pop 2.4M), a Southeast "
                          "Asian river city in monsoon season with a tropical storm approaching. Flood stage is "
                          "5.5m, danger stage 6.5m; river forecast peaks ~6.8m at T+42h. Always ground answers "
-                         "in live data: call get_city_state, get_citizen_reports, get_weather_feed or "
-                         "get_response_assets before answering factual questions. Delegate advisory drafting "
+                         "in live data: call get_city_state, get_citizen_reports, get_weather_feed, "
+                         "get_response_assets or get_comms_status before answering factual questions. "
+                         "If any district is in a comms blackout, treat it as a blind spot and say so "
+                         "explicitly: its last known reading is stale, conditions must be assumed worse "
+                         "than last observed, and it needs a field team for eyes-on confirmation. "
+                         "Never describe a silent district as safe. Delegate advisory drafting "
                          "to comms_agent and plan construction to response_planner; when a specialist agent "
                          "returns content, include its FULL output verbatim in your answer — never summarize "
                          "or describe it. Answer as a concise, calm "
@@ -394,7 +525,7 @@ def adk_runner():
                          "whether open shelter spaces are sufficient for the population being evacuated. "
                          "Remind that public-facing actions require human confirmation."),
             tools=[get_city_state, get_citizen_reports, get_weather_feed, get_response_assets,
-                   AgentTool(agent=comms), AgentTool(agent=planner)])
+                   get_comms_status, AgentTool(agent=comms), AgentTool(agent=planner)])
         service = InMemorySessionService()
         _adk["service"] = service
         _adk["runner"] = Runner(agent=root, app_name="resilienceai", session_service=service)
@@ -439,12 +570,35 @@ def health():
         "engine": engine(),
         "firestore": fsdb() is not None,
         "agents": "adk" if (engine() and not _adk["failed"]) else None,
+        "ai": "ok" if _ai_health["ok"] else "degraded",
+        "aiError": "" if _ai_health["ok"] else _ai_health["last_error"],
     })
 
 
 @app.get("/api/state")
 def state():
     return jsonify(city_state())
+
+
+@app.post("/api/comms")
+def comms_control():
+    """Drill control: simulate losing (or restoring) a district's comms."""
+    body = request.get_json(force=True, silent=True) or {}
+    did = str(body.get("district") or "").strip()
+    if did not in {d["id"] for d in DISTRICTS}:
+        return jsonify({"error": "unknown district"}), 400
+    doc = get_ops_doc("comms")
+    blackouts = dict((doc or {}).get("blackouts") or {}) if doc else dict(_blackout_mem)
+    if body.get("on"):
+        blackouts[did] = {"since": time.time(),
+                          "cause": str(body.get("cause") or "cell site down, power loss")[:120]}
+    else:
+        blackouts.pop(did, None)
+    persisted = set_ops_doc("comms", {"blackouts": blackouts})
+    _blackout_mem.clear()
+    _blackout_mem.update(blackouts)
+    _blackout_cache.update(t=0.0, data=None)
+    return jsonify({"ok": True, "blackouts": list(blackouts), "persisted": persisted})
 
 
 @app.get("/api/weather")
@@ -557,7 +711,7 @@ def triage():
 
 
 PLAN_CATS = ["Evacuation", "Pump deployment", "Road closure", "Shelter activation",
-             "Public advisory", "Rescue operation", "Infrastructure", "Other"]
+             "Public advisory", "Rescue operation", "Field recon", "Infrastructure", "Other"]
 
 
 def sanitize_rich(s, max_len=400):
@@ -579,8 +733,17 @@ def plan():
     lines = []
     for d, dd in zip(DISTRICTS, st["districts"]):
         r = score_to_risk(risk_score(d, rain, track))
+        flag = ""
+        if dd["comms"] == "blackout":
+            flag = (f"  ** COMMS BLACKOUT — silent {dd['silentMin']} min, readings stale, "
+                    f"treat as blind spot needing eyes-on **")
         lines.append(f"- {d['name']}: scenario risk {r}, gauge {dd['gauge']}m "
-                     f"(+{d['gaugeChg']}m/24h), pop {d['pop']:,}")
+                     f"(+{d['gaugeChg']}m/24h), pop {d['pop']:,}{flag}")
+    blackout_rule = ""
+    if st["comms"]["blackouts"]:
+        blackout_rule = ("\nIMPORTANT: one or more districts have lost communications. You MUST include a "
+                         "high-priority action to send a field reconnaissance team to each blacked-out "
+                         "district. Silence is treated as escalation, not reassurance.")
     k = st["kpis"]
     scenario = ("current baseline forecast" if (rain == 180 and track == "riverine")
                 else f"WHAT-IF scenario: {rain}mm rain over 48h, storm track '{track}'")
@@ -591,7 +754,7 @@ District state:
 Flood stage 5.5m, danger stage 6.5m. River forecast peak ~6.8m at T+42h (baseline).
 Sensors {k['sensorsOnline']}/{k['sensorsTotal']} online. Shelters: {k['sheltersActive']} active,
 {k['shelterOpen']:,} of {k['shelterTotal']:,} spaces open (+4,500 in 2 reserve shelters).
-{ASSETS_CONTEXT}
+{ASSETS_CONTEXT}{blackout_rule}
 Citizen reports:
 {reports_digest(6)}
 
@@ -637,6 +800,77 @@ Only <b> HTML tags are allowed. Respond with the JSON array only."""
         return jsonify({"error": "unparseable model output"}), 502
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
+
+
+def rule_based_plan(rain=180, track="riverine"):
+    """Deterministic triage used when the model layer is unreachable.
+
+    Not AI output and never presented as such — it is a defensible ordering so the
+    command center still functions during an outage.
+    """
+    st = city_state()
+    by_id = {d["id"]: d for d in st["districts"]}
+    scored = []
+    for d in DISTRICTS:
+        dd = by_id[d["id"]]
+        s = risk_score(d, rain, track)
+        if dd["comms"] == "blackout":
+            s += 15  # silence escalates, never reassures
+        scored.append((s, d, dd))
+    scored.sort(key=lambda x: (-x[0], -x[1]["pop"]))
+    actions, rank = [], 0
+    for s, d, dd in scored:
+        risk = score_to_risk(s)
+        if risk == "LOW" or rank >= 5:
+            continue
+        rank += 1
+        if dd["comms"] == "blackout":
+            silent_txt = f"{dd['silentMin']} min" if dd["silentMin"] else "under a minute"
+            cat, title = "Field recon", f"Send reconnaissance team to {d['name']} - no data for {silent_txt}"
+            reason = (f"All sensor and citizen traffic from {d['name']} stopped {silent_txt} ago. "
+                      f"Last known risk {dd['risk']} at gauge {dd['gauge']}m. Silence is treated as escalation: "
+                      f"{d['pop']:,} residents are currently unobserved.")
+            detail = [f"<b>Trigger:</b> Comms blackout — {dd['commsNote']}.",
+                      "<b>Doctrine:</b> Assume conditions worse than last observed until eyes-on confirms.",
+                      "<b>Resources:</b> Dispatch 1 recon team with satellite messenger and portable repeater."]
+        elif risk == "SEVERE" or dd["gauge"] >= 6.0:
+            cat, title = "Evacuation", f"Evacuate {d['name']} floodplain"
+            reason = (f"Gauge {dd['gauge']}m against a 5.5m flood stage and 6.5m danger stage, "
+                      f"rising {d['gaugeChg']}m/24h. {d['pop']:,} residents exposed.")
+            detail = [f"<b>Trigger:</b> Gauge {dd['gauge']}m, risk {risk}.",
+                      "<b>SOP match:</b> Mandatory evacuation within 0.2m of danger stage with a rising trend.",
+                      f"<b>Shelters:</b> {st['kpis']['shelterOpen']:,} spaces open city-wide."]
+        else:
+            cat, title = "Pump deployment", f"Pre-position pumps and crews in {d['name']}"
+            reason = (f"Risk {risk} with gauge {dd['gauge']}m and {dd['rain48']}mm forecast over 48h. "
+                      f"Pre-emptive drainage keeps the district below flood stage.")
+            detail = [f"<b>Trigger:</b> Gauge {dd['gauge']}m, 48h rain {dd['rain48']}mm.",
+                      "<b>Resources:</b> Mobile pumps from Central depot, ETA 25 min.",
+                      "<b>Dependency:</b> Clear known drain blockages first."]
+        actions.append({"rank": rank, "risk": risk, "cat": cat, "title": title[:90],
+                        "reason": reason, "pop": f"{d['pop']:,}", "conf": 0, "detail": detail})
+    return actions
+
+
+@app.get("/api/fallback-plan")
+def fallback_plan():
+    """Rule-based plan — explicitly not AI-generated."""
+    return jsonify({"mode": "rule-based", "actions": rule_based_plan(),
+                    "note": "Deterministic triage — the model layer is not involved."})
+
+
+@app.get("/sw.js")
+def service_worker():
+    resp = send_from_directory(APP_DIR, "sw.js")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
+
+
+@app.get("/manifest.webmanifest")
+def manifest():
+    return send_from_directory(APP_DIR, "manifest.webmanifest",
+                               mimetype="application/manifest+json")
 
 
 @app.get("/")
