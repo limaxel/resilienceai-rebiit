@@ -5,7 +5,7 @@
 An AI-powered flood early-warning and decision-intelligence platform for Southeast Asian river and coastal cities, built for the **Google Cloud Gen AI Academy APAC Edition** hackathon (Challenge 1 — AI for Better Living and Smarter Communities).
 
 **🔴 Live demo:** https://resilienceai-16862175850.asia-southeast1.run.app
-*(deployed on Cloud Run — the AI Response Assistant and photo triage are fully live, no setup needed)*
+**📱 Citizen app:** https://resilienceai-16862175850.asia-southeast1.run.app/report
 
 **Team rebiit** · Lim Kai Lun Axel
 
@@ -19,15 +19,15 @@ Floods are APAC's costliest disaster. When a storm hits, city response teams los
 
 It fuses sensor, weather, and citizen data into one live operational picture, then turns it into ranked, explainable decisions:
 
-| Capability | What it does |
-|---|---|
-| **Live Risk Map** | District-level flood-risk heat map, updated as sensors stream |
-| **72-hour Risk Forecast** | River & rainfall forecasts with confidence bands (Vertex AI) |
-| **AI Response Assistant** | Ask in natural language, get grounded answers citing live data (Gemini 2.5) |
-| **Citizen Reports Triage** | Gemini multimodal classifies photo reports by type/severity, flags duplicates |
-| **Ranked Action Recommendations** | Prioritized actions with reasoning, population impact, confidence |
-| **Multilingual Public Advisories** | One-click alerts in English + Bahasa, human-confirmed before broadcast |
-| **What-If Scenario Simulator** | Adjust rainfall/storm track — risk and plan recompute instantly |
+| Capability | What it does | Powered by |
+|---|---|---|
+| **Live Risk Map** | District-level flood-risk heat map, updated as state evolves | live `/api/state` |
+| **72-hour Risk Forecast** | River & rainfall forecasts with confidence bands, plus a **real live rainfall feed** | Open-Meteo (live) |
+| **AI Response Assistant** | Ask in natural language — an **ADK multi-agent team** (root + comms + planner) calls live-data tools and answers with a visible tool trace | ADK + Gemini 2.5 on Vertex AI |
+| **Citizen Reports Triage** | Gemini multimodal classifies photo reports by type/severity, flags duplicates against the existing feed, and **persists them in Firestore** | Gemini on Vertex AI + Firestore |
+| **Citizen mobile app** (`/report`) | Citizens snap a photo → AI classifies it → it lands in the operator queue with safety advice back to the citizen | Gemini on Vertex AI |
+| **Ranked Action Recommendations** | One click regenerates the full ranked response plan **live**, grounded on current state + citizen reports | Gemini on Vertex AI |
+| **What-If Scenario Simulator** | Adjust rainfall/storm track — risk recomputes instantly, and Gemini **re-plans the response for that scenario** | Gemini on Vertex AI |
 
 **Responsible AI by design:** every public-facing action requires human confirmation, and every recommendation explains its reasoning and cites its data.
 
@@ -35,35 +35,31 @@ It fuses sensor, weather, and citizen data into one live operational picture, th
 
 ```mermaid
 flowchart LR
-  subgraph Ingestion
-    S[IoT river & rain sensors] --> PS[Pub/Sub]
-    W[Weather API] --> PS
-    C[Citizen mobile app] --> FS[Firestore]
-    PS --> DF[Dataflow]
+  subgraph Clients
+    CC[Command center SPA] --> CR
+    CA[Citizen app /report] --> CR
   end
-  subgraph Data
-    DF --> BQ[BigQuery]
-    DF --> CS[Cloud Storage]
+  subgraph Cloud Run
+    CR[Flask serving layer]
+    CR --> ADK[ADK multi-agent team<br/>root · comms · response planner<br/>+ live-data tools]
   end
-  subgraph AI & Agents
-    BQ --> V[Vertex AI forecasting]
-    BQ --> BML[BigQuery ML anomaly detection]
-    V --> AE[Vertex AI Agent Engine — ADK multi-agent<br/>Root · Data Analyst · Risk Forecaster · Response Planner · Comms<br/>powered by Gemini 2.5]
-    VS[Vertex AI Search — RAG over SOPs] --> AE
-  end
-  subgraph Serving
-    AE --> CR[Cloud Run — command center + citizen PWA]
-    CR --> AL[Pub/Sub alert fan-out → SMS/push]
+  ADK --> V[Vertex AI · Gemini 2.5 Flash<br/>IAM auth — no API keys]
+  CR --> FS[(Firestore<br/>citizen reports)]
+  CR --> OM[Open-Meteo live weather]
+  subgraph Simulated data plane
+    ST[/Time-evolving city state<br/>gauges · sensors · KPIs/] --> CR
   end
 ```
 
-The prototype in this repo implements the serving layer end-to-end (deployed on Cloud Run) with a realistic simulated data plane; Gemini calls are real and run server-side so the browser never sees an API key.
+**What's real:** all Gemini calls (chat, triage, planning) run on **Vertex AI** with IAM service-identity auth — there is no API key anywhere in the stack. Citizen reports persist in **Firestore**. Weather comes live from **Open-Meteo**. The Assistant is a real **ADK multi-agent** system whose tool calls are shown in the UI.
+**What's simulated:** Delta City itself — river gauges, sensors and KPIs are a deterministic time-evolving simulation (`/api/state`), clearly disclosed, so the operational scenario stays demonstrable year-round.
 
 ## Repo layout
 
 ```
-prototype/index.html   # the command center — self-contained single-file web app
-deploy/server.py       # Flask backend: serves the app + proxies Gemini (/api/chat, /api/triage)
+prototype/index.html   # command center — self-contained single-file web app
+prototype/report.html  # citizen mobile reporting app
+deploy/server.py       # Flask + ADK agents + Firestore + Vertex AI serving layer
 deploy/Dockerfile      # Cloud Run container
 deploy/requirements.txt
 ```
@@ -72,17 +68,21 @@ deploy/requirements.txt
 
 ```bash
 pip install -r deploy/requirements.txt
-cp prototype/index.html deploy/index.html
-GEMINI_API_KEY=<your-key> python deploy/server.py
+cp prototype/index.html prototype/report.html deploy/
+GEMINI_API_KEY=<your-key> python deploy/server.py   # local dev fallback auth
 # open http://127.0.0.1:8080
 ```
 
-No key? The app runs in demo mode with curated responses. You can also open `prototype/index.html` directly in a browser (file://) and paste a Gemini API key via the settings gear.
+No key? The command center runs in demo mode with curated responses.
 
-## Deploy to Cloud Run
+## Deploy to Cloud Run (production — Vertex AI, no API keys)
 
 ```bash
-cp prototype/index.html deploy/index.html
-gcloud run deploy resilienceai --source deploy --region asia-southeast1 \
-  --allow-unauthenticated --set-env-vars GEMINI_API_KEY=<your-key>
+cp prototype/index.html prototype/report.html deploy/
+gcloud services enable aiplatform.googleapis.com firestore.googleapis.com
+gcloud firestore databases create --location=<region> --type=firestore-native
+gcloud run deploy resilienceai --source deploy --region <region> \
+  --allow-unauthenticated \
+  --set-env-vars GOOGLE_CLOUD_PROJECT=<project>,VERTEX_LOCATION=global
+# grant the service account roles/aiplatform.user + roles/datastore.user
 ```

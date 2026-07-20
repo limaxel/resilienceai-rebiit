@@ -8,8 +8,9 @@ deck/
 brief.md
 demo_video_guide.md
 
-# Build copy (deploy/index.html is synced from prototype/index.html at deploy time)
+# Build copies (synced from prototype/ at deploy time)
 deploy/index.html
+deploy/report.html
 
 # Local tooling
 .claude/

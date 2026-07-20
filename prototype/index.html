@@ -517,6 +517,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
       <span class="tag"><b id="rpUnverified">10</b> awaiting review</span>
       <span class="tag"><b>3</b> duplicate clusters</span>
       <span class="tag">Firestore + Cloud Storage feed</span>
+      <a class="tag" href="/report" target="_blank" rel="noopener" style="text-decoration:none;color:var(--accent)">📱 Citizen app → /report</a>
     </div>
   </div>
 
@@ -1295,10 +1296,26 @@ async function askCopilot(q){
   const typing = SHOT?null:addTyping();
   if(BACKEND || key){
     try{
-      const ans = BACKEND ? await callBackendChat(q) : await callGemini(key, q);
+      let ans, trace = [], agentic = false;
+      if(BACKEND){
+        const r = await callBackendChat(q);
+        ans = r.text; trace = r.trace || []; agentic = r.agents === "adk";
+      } else {
+        ans = await callGemini(key, q);
+      }
       if(typing) typing.remove();
-      const src = BACKEND ? (ENGINE==="vertex" ? "gemini-2.5-flash · Vertex AI · live" : "ResilienceAI backend · live") : "gemini-2.5-flash · live";
-      addMsg("ai", `<p>${escapeHtml(ans).replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')}</p><div class="cite-row"><span class="cite">${src}</span><span class="cite">grounded on city state</span></div>`);
+      let cites;
+      if(agentic){
+        const toolLabel = {get_city_state:"live city state", get_citizen_reports:"citizen reports",
+          get_weather_feed:"Open-Meteo live feed", get_response_assets:"response assets",
+          comms_agent:"Comms Agent", response_planner:"Response Planner Agent"};
+        cites = `<span class="cite">ADK multi-agent · Gemini on Vertex AI</span>`
+          + trace.map(t=>`<span class="cite">🔧 ${escapeHtml(toolLabel[t]||t)}</span>`).join("");
+      } else {
+        const src = BACKEND ? (ENGINE==="vertex" ? "gemini-2.5-flash · Vertex AI · live" : "ResilienceAI backend · live") : "gemini-2.5-flash · live";
+        cites = `<span class="cite">${src}</span><span class="cite">grounded on city state</span>`;
+      }
+      addMsg("ai", `<p>${escapeHtml(ans).replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')}</p><div class="cite-row">${cites}</div>`);
       return;
     }catch(err){
       if(typing) typing.remove();
@@ -1316,9 +1333,8 @@ async function callBackendChat(q){
   });
   if(!res.ok){ const t=await res.text(); throw new Error("HTTP "+res.status+" "+t.slice(0,120)); }
   const j = await res.json();
-  const txt = j && j.text;
-  if(!txt) throw new Error("empty response");
-  return String(txt).trim();
+  if(!j || !j.text) throw new Error("empty response");
+  return {text:String(j.text).trim(), trace:j.trace||[], agents:j.agents||null};
 }
 function demoAnswer(q){
   const match = DEMO_QA.find(p=>p.q.toLowerCase()===q.toLowerCase())

@@ -317,6 +317,120 @@ the open shelter spaces are sufficient for the population being evacuated. When 
 for advisories, provide English and Bahasa Indonesia versions."""
 
 
+# ---------------------------------------------------------------- ADK multi-agent
+# Root operations agent + comms & planner specialists (Agent Development Kit).
+# Tool functions give the agents live grounding; docstrings are tool specs.
+def get_city_state() -> dict:
+    """Live Delta City state: district river gauges, risk levels, 48h rain, population, sensor readings, shelter capacity and active alerts."""
+    return city_state()
+
+
+def get_citizen_reports() -> dict:
+    """Latest AI-triaged citizen reports from the field (severity, type, district, summary)."""
+    return {"reports": reports_digest(10)}
+
+
+def get_weather_feed() -> dict:
+    """Real 72-hour rainfall forecast from the live Open-Meteo feed for the pilot region."""
+    try:
+        return get_weather()
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+def get_response_assets() -> dict:
+    """Available response assets: pumps, crews, rescue boats, buses, shelters (incl. reserves) and egress route status."""
+    return {"assets": ASSETS_CONTEXT}
+
+
+_adk = {"runner": None, "failed": False}
+
+
+def adk_runner():
+    if _adk["runner"] is not None:
+        return _adk["runner"]
+    if _adk["failed"] or not engine():
+        return None
+    try:
+        if engine() == "vertex":
+            os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
+            os.environ.setdefault("GOOGLE_CLOUD_LOCATION", LOCATION)
+        else:
+            os.environ.setdefault("GOOGLE_API_KEY", API_KEY)
+        from google.adk.agents import LlmAgent
+        from google.adk.runners import Runner
+        from google.adk.sessions import InMemorySessionService
+        from google.adk.tools.agent_tool import AgentTool
+
+        comms = LlmAgent(
+            name="comms_agent", model=MODEL,
+            description="Drafts calm, clear public advisories in English AND Bahasa Indonesia for a given district and hazard.",
+            instruction=("You draft public emergency advisories for Delta City. Always produce both an "
+                         "English and a Bahasa Indonesia version, tone-checked: calm, clear, actionable, "
+                         "~grade-6 reading level. Include where to go (nearest shelters), what to bring, "
+                         "and what to avoid. The ONLY named shelters are: Riverside Community Hall and "
+                         "Northgate Sports Complex (Riverside North zone), Kampung Baru Community School "
+                         "Hall (Kampung Baru zone), Hillside West Community Hall (reserve, high ground). "
+                         "Never invent street addresses or other place names — otherwise say 'the nearest "
+                         "relief shelter'. End by noting human confirmation is required before broadcast."))
+        planner = LlmAgent(
+            name="response_planner", model=MODEL,
+            description="Produces or revises the ranked flood-response action plan (evacuations, pumps, closures, shelters).",
+            instruction=("You are the response planning specialist for Delta City flood operations. "
+                         "Given the situation, produce concise ranked actions with population impact, "
+                         "trigger data and required resources. Cite concrete figures."))
+        root = LlmAgent(
+            name="resilience_root", model=MODEL,
+            description="Root operations assistant for the ResilienceAI flood command center.",
+            instruction=("You are the ResilienceAI Response Assistant for Delta City (pop 2.4M), a Southeast "
+                         "Asian river city in monsoon season with a tropical storm approaching. Flood stage is "
+                         "5.5m, danger stage 6.5m; river forecast peaks ~6.8m at T+42h. Always ground answers "
+                         "in live data: call get_city_state, get_citizen_reports, get_weather_feed or "
+                         "get_response_assets before answering factual questions. Delegate advisory drafting "
+                         "to comms_agent and plan construction to response_planner; when a specialist agent "
+                         "returns content, include its FULL output verbatim in your answer — never summarize "
+                         "or describe it. Answer as a concise, calm "
+                         "operations assistant citing figures. When recommending evacuations, always check "
+                         "whether open shelter spaces are sufficient for the population being evacuated. "
+                         "Remind that public-facing actions require human confirmation."),
+            tools=[get_city_state, get_citizen_reports, get_weather_feed, get_response_assets,
+                   AgentTool(agent=comms), AgentTool(agent=planner)])
+        service = InMemorySessionService()
+        _adk["service"] = service
+        _adk["runner"] = Runner(agent=root, app_name="resilienceai", session_service=service)
+        return _adk["runner"]
+    except Exception:
+        _adk["failed"] = True
+        return None
+
+
+def run_agent(question):
+    """Run one question through the ADK agent team; returns (answer, tool_trace)."""
+    import asyncio
+    import uuid
+    runner = adk_runner()
+    if runner is None:
+        raise RuntimeError("agent runner unavailable")
+
+    async def _go():
+        sid = uuid.uuid4().hex
+        await _adk["service"].create_session(app_name="resilienceai", user_id="ops", session_id=sid)
+        msg = types.Content(role="user", parts=[types.Part.from_text(text=question[:4000])])
+        final, trace = "", []
+        async for ev in runner.run_async(user_id="ops", session_id=sid, new_message=msg):
+            try:
+                for fc in ev.get_function_calls() or []:
+                    if fc.name and fc.name not in trace:
+                        trace.append(fc.name)
+            except Exception:
+                pass
+            if ev.is_final_response() and ev.content and ev.content.parts:
+                final = "".join(p.text or "" for p in ev.content.parts)
+        return final.strip(), trace
+
+    return asyncio.run(_go())
+
+
 # ---------------------------------------------------------------- Routes
 @app.get("/api/health")
 def health():
@@ -324,6 +438,7 @@ def health():
         "mode": "live" if engine() else "demo",
         "engine": engine(),
         "firestore": fsdb() is not None,
+        "agents": "adk" if (engine() and not _adk["failed"]) else None,
     })
 
 
@@ -367,6 +482,14 @@ def chat():
         role = "user" if turn.get("role") == "user" else "model"
         contents.append({"role": role, "parts": [{"text": str(turn.get("text", ""))[:4000]}]})
     contents.append({"role": "user", "parts": [{"text": question[:4000]}]})
+    # Preferred path: ADK multi-agent team (root + comms + planner with live tools)
+    if not body.get("context") and adk_runner() is not None:
+        try:
+            answer, trace = run_agent(question)
+            if answer:
+                return jsonify({"text": answer, "trace": trace, "agents": "adk"})
+        except Exception:
+            pass  # fall through to the direct-generation path
     system = body.get("context") or chat_context()
     try:
         return jsonify({"text": generate(contents, system=str(system)[:16000])})
@@ -519,6 +642,11 @@ Only <b> HTML tags are allowed. Respond with the JSON array only."""
 @app.get("/")
 def index():
     return send_from_directory(APP_DIR, "index.html")
+
+
+@app.get("/report")
+def report_page():
+    return send_from_directory(APP_DIR, "report.html")
 
 
 @app.get("/<path:path>")

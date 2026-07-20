@@ -1,5 +1,6 @@
-flask==3.0.3
-gunicorn==22.0.0
-requests==2.32.3
+flask>=3.0
+gunicorn>=22.0
+requests>=2.32.3
 google-genai>=1.24.0
 google-cloud-firestore>=2.19.0
+google-adk>=1.5.0
