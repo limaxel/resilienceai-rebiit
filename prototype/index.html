@@ -562,6 +562,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
     <div class="head-tags">
       <span class="tag"><b>6</b> recommendations</span>
       <span class="tag">Prioritized by risk × population × time-to-impact</span>
+      <button class="btn primary" id="regenPlanBtn" style="display:none;align-items:center;gap:7px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.4 2.3 7.2L12 16.5 5.7 20.8 8 13.6 2 9.2h7.6z"/></svg>
+        Re-plan live with Gemini
+      </button>
     </div>
   </div>
   <div class="actions-list" id="actionsMount"></div>
@@ -594,6 +598,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
         <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;font-weight:600">Districts by risk level</div>
         <div class="scenario-summary" id="scenarioSummary"></div>
         <div class="scenario-delta" id="scenarioDelta"></div>
+        <button class="btn primary" id="scenarioPlanBtn" style="display:none;margin-top:14px;width:100%;justify-content:center;align-items:center;gap:7px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.4 2.3 7.2L12 16.5 5.7 20.8 8 13.6 2 9.2h7.6z"/></svg>
+          Re-plan this scenario with Gemini
+        </button>
       </div>
     </div>
     <div class="panel map-wrap">
@@ -655,7 +663,8 @@ if(SHOT) document.body.classList.add("no-anim");
    On load we probe /api/health; if it returns {mode:"live"} we route all
    Gemini calls through the backend (key managed server-side). On file://
    or with no backend, this fails silently/instantly and behavior is unchanged. */
-let BACKEND = false;
+let BACKEND = false, ENGINE = null;
+let STATE = null, WEATHER = null;
 async function checkBackend(){
   try{
     const ctrl = new AbortController();
@@ -664,8 +673,38 @@ async function checkBackend(){
     clearTimeout(t);
     if(!res.ok) return;
     const j = await res.json();
-    if(j && j.mode === "live"){ BACKEND = true; refreshMode(); }
+    if(j && j.mode === "live"){
+      BACKEND = true; ENGINE = j.engine || null; refreshMode();
+      refreshState(); refreshWeather(); refreshServerReports();
+      if(!SHOT){ setInterval(refreshState, 20000); setInterval(refreshServerReports, 60000); }
+    }
   }catch(e){ /* file:// or no backend — stay in direct-key / demo mode */ }
+}
+/* Pull the authoritative time-evolving city state from the backend and
+   merge it into the local model so every viewer sees the same city. */
+async function refreshState(){
+  try{
+    const res = await fetch("/api/state", {cache:"no-store"});
+    if(!res.ok) return;
+    STATE = await res.json();
+    (STATE.districts||[]).forEach(sd=>{
+      const d = DISTRICTS.find(x=>x.id===sd.id);
+      if(d){ d.gauge = sd.gauge; d.rain = sd.rain48; }
+    });
+    (STATE.sensors||[]).forEach(ss=>{
+      const s = SENSOR_POOL.find(x=>x.id===ss.id);
+      if(s) s.base = ss.val;
+    });
+    if(curView==="dashboard") renderDashboard();
+  }catch(e){}
+}
+async function refreshWeather(){
+  try{
+    const res = await fetch("/api/weather", {cache:"no-store"});
+    if(!res.ok) return;
+    const j = await res.json();
+    if(j && j.precip){ WEATHER = j; if(curView==="dashboard") renderDashboard(); }
+  }catch(e){}
 }
 function isLive(){ return BACKEND || !!getKey(); }
 
@@ -850,18 +889,28 @@ function buildForecast(){
   riverSvg += `<text class="axis-title" x="${mL-38}" y="${mT-4}" >River level (m)</text>`;
   riverSvg += `</svg>`;
 
-  // ---- Rainfall chart ----
+  // ---- Rainfall chart (storm exercise vs live Open-Meteo feed) ----
+  const liveRain = rainMode==="live" && WEATHER && WEATHER.precip;
+  let rainVals = f.rain, rainColor = ACCENT2;
+  if(liveRain){
+    // aggregate hourly Open-Meteo precipitation into the chart's 3h buckets
+    rainVals = f.hrs.map(h=>{
+      let s=0; for(let i=h;i<h+3;i++) s += (WEATHER.precip[i]||0);
+      return s;
+    });
+    rainColor = "#22c55e";
+  }
   const rH2=132, mB2=26;
   const ih2 = rH2-mT-mB2;
-  const rmax=30;
+  const rmax = liveRain ? Math.max(6, Math.ceil(Math.max(...rainVals)*1.25)) : 30;
   const Y2 = v => mT + (1-v/rmax)*ih2;
   const bw = Math.max(5, iw/f.hrs.length - 3);
   let rainSvg = `<svg class="chart-svg" viewBox="0 0 ${W} ${rH2}" role="img" aria-label="72-hour rainfall forecast">`;
-  [0,10,20,30].forEach(v=>{ rainSvg+=`<line class="grid-line" x1="${mL}" y1="${Y2(v)}" x2="${W-mR}" y2="${Y2(v)}"/>
+  [0,1,2,3].map(i=>Math.round(rmax*i/3)).forEach(v=>{ rainSvg+=`<line class="grid-line" x1="${mL}" y1="${Y2(v)}" x2="${W-mR}" y2="${Y2(v)}"/>
     <text class="axis-label" x="${mL-8}" y="${Y2(v)+3.5}" text-anchor="end">${v}</text>`;});
   f.hrs.forEach((h,i)=>{
-    const bh = (mT+ih2)-Y2(f.rain[i]);
-    rainSvg += `<rect x="${X(h)-bw/2}" y="${Y2(f.rain[i])}" width="${bw}" height="${Math.max(0,bh)}" rx="2" fill="${ACCENT2}" opacity="0.85"/>`;
+    const bh = (mT+ih2)-Y2(rainVals[i]);
+    rainSvg += `<rect x="${X(h)-bw/2}" y="${Y2(rainVals[i])}" width="${bw}" height="${Math.max(0,bh)}" rx="2" fill="${rainColor}" opacity="0.85"/>`;
   });
   [0,12,24,36,48,60,72].forEach(h=>{
     rainSvg+=`<text class="axis-label" x="${X(h)}" y="${rH2-8}" text-anchor="middle">${h===0?'now':'+'+h+'h'}</text>`;});
@@ -879,25 +928,38 @@ function buildForecast(){
       <div class="cl-item"><span class="cl-key" style="background:${RISK.SEVERE.color}"></span>Danger level</div>
     </div>
     <div style="height:14px"></div>
-    <div class="chart-title">Rainfall forecast</div>
-    <div class="chart-sub">National weather service · 180 mm total projected over 48h</div>
+    <div class="chart-title" style="display:flex;align-items:center;gap:10px">Rainfall forecast
+      ${WEATHER?`<span style="margin-left:auto;display:inline-flex;gap:4px">
+        <button class="rain-tab" data-mode="storm" style="font:inherit;font-size:10.5px;padding:3px 9px;border-radius:99px;cursor:pointer;border:1px solid rgba(148,163,184,0.25);background:${rainMode!=="live"?"rgba(129,140,248,0.2)":"transparent"};color:${rainMode!=="live"?"#b6bdf9":"var(--muted)"}">Storm exercise</button>
+        <button class="rain-tab" data-mode="live" style="font:inherit;font-size:10.5px;padding:3px 9px;border-radius:99px;cursor:pointer;border:1px solid rgba(148,163,184,0.25);background:${rainMode==="live"?"rgba(34,197,94,0.18)":"transparent"};color:${rainMode==="live"?"#7fe6a5":"var(--muted)"}">● Live feed</button>
+      </span>`:""}
+    </div>
+    <div class="chart-sub">${liveRain
+      ? `Open-Meteo live data · ${escapeHtml(WEATHER.place)} · ${WEATHER.total48} mm real precipitation next 48h · fetched ${new Date(WEATHER.fetched).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"})}`
+      : `Storm simulation exercise · 180 mm total projected over 48h`}</div>
     ${rainSvg}`;
 }
+let rainMode = "storm";
 
 /* ============================================================
    KPI TILES
    ============================================================ */
 function buildKPIs(){
-  const atRisk = DISTRICTS.filter(d=>{const r=districtRisk(d,180,"riverine");return r==="HIGH"||r==="MODERATE"||r==="SEVERE";}).reduce((a,d)=>a+d.pop,0);
+  const k = STATE && STATE.kpis;
+  const atRisk = k ? k.popAtRisk : DISTRICTS.filter(d=>{const r=districtRisk(d,180,"riverine");return r==="HIGH"||r==="MODERATE"||r==="SEVERE";}).reduce((a,d)=>a+d.pop,0);
+  const alerts = k ? k.alerts : 7, aHigh = k ? k.alertsHigh : 2, aMod = k ? k.alertsMod : 5;
+  const sOn = k ? k.sensorsOnline : 40, sTot = k ? k.sensorsTotal : 42;
+  const shOpen = k ? k.shelterOpen : 18400, shTot = k ? k.shelterTotal : 30000, shAct = k ? k.sheltersActive : 12;
+  const shPct = Math.round(shOpen/shTot*100);
   const tiles = [
     {cls:"k-accent-high", label:"Population at risk", val:fmtCompact(atRisk), unit:"", icon:iconUsers("#f97316"),
       delta:`<span class="up">▲ +180k</span> vs 24h ago · in HIGH/MODERATE zones`, track:null},
-    {cls:"k-accent-mod", label:"Active alerts", val:"7", unit:"", icon:iconBell("#eab308"),
-      delta:`<span class="up">▲ 3 new</span> · 2 HIGH · 5 MODERATE`, track:null},
-    {cls:"k-accent-low", label:"Sensors online", val:"40", unit:"/ 42", icon:iconActivity("#22c55e"),
-      delta:`95% uptime · 2 gauges offline in Eastgate`, track:{pct:95,color:"#22c55e"}},
-    {cls:"k-accent-accent", label:"Shelter capacity", val:"18,400", unit:"open", icon:iconHome("#38bdf8"),
-      delta:`12 shelters active · 61% of 30,000 free`, track:{pct:39,color:"#38bdf8"}}
+    {cls:"k-accent-mod", label:"Active alerts", val:""+alerts, unit:"", icon:iconBell("#eab308"),
+      delta:`<span class="up">▲ 3 new</span> · ${aHigh} HIGH · ${aMod} MODERATE`, track:null},
+    {cls:"k-accent-low", label:"Sensors online", val:""+sOn, unit:"/ "+sTot, icon:iconActivity("#22c55e"),
+      delta:`${Math.round(sOn/sTot*100)}% uptime · 2 gauges offline in Eastgate`, track:{pct:Math.round(sOn/sTot*100),color:"#22c55e"}},
+    {cls:"k-accent-accent", label:"Shelter capacity", val:fmtNum(shOpen), unit:"open", icon:iconHome("#38bdf8"),
+      delta:`${shAct} shelters active · ${shPct}% of ${fmtNum(shTot)} free`, track:{pct:100-shPct,color:"#38bdf8"}}
   ];
   return tiles.map(t=>`
     <div class="kpi ${t.cls}">
@@ -1061,8 +1123,9 @@ const ACTIONS = [
    pop:"605,000", conf:91,
    detail:["<b>Channels:</b> SMS + citizen-app push via Pub/Sub fan-out; est. reach 605,000.","<b>Languages:</b> English + Bahasa Indonesia/Melayu, tone-checked for clarity and calm.","<b>Responsible AI:</b> Human-in-the-loop confirmation gate before any public broadcast."]}
 ];
-function buildActions(){
-  return ACTIONS.map((a,i)=>{
+function buildActions(){ return buildActionsFrom(ACTIONS); }
+function buildActionsFrom(list){
+  return list.map((a,i)=>{
     const c = RISK[a.risk].color;
     return `<div class="action-card">
       <div class="ac-main">
@@ -1091,6 +1154,38 @@ function buildActions(){
       </div>
     </div>`;
   }).join("");
+}
+
+/* ---------- Live plan generation (/api/plan) ---------- */
+let planBusy = false;
+async function regenPlan(scenario){
+  if(planBusy || !BACKEND) return;
+  planBusy = true;
+  const mount = document.getElementById("actionsMount");
+  const btn = document.getElementById("regenPlanBtn");
+  if(btn){ btn.disabled = true; }
+  const sc = scenario || {rain:180, track:"riverine"};
+  mount.innerHTML = `<div class="plan-banner" style="border:1px solid rgba(56,189,248,0.35);background:rgba(56,189,248,0.08);color:#7dd3fc;border-radius:10px;padding:12px 16px;font-size:13px;display:flex;align-items:center;gap:10px">
+    <span class="lb-dot" style="width:8px;height:8px;border-radius:50%;background:#38bdf8;display:inline-block"></span>
+    Response Planner is generating a live plan with Gemini — ${sc.rain} mm rainfall · ${escapeHtml(sc.track)} track…</div>`;
+  try{
+    const res = await fetch("/api/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sc)});
+    if(!res.ok){ const t=await res.text(); throw new Error("HTTP "+res.status+" "+t.slice(0,100)); }
+    const j = await res.json();
+    if(!j.actions || !j.actions.length) throw new Error("empty plan");
+    const when = new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
+    const isBase = sc.rain===180 && sc.track==="riverine";
+    mount.innerHTML = `<div class="plan-banner" style="border:1px solid rgba(34,197,94,0.35);background:rgba(34,197,94,0.08);color:#7fe6a5;border-radius:10px;padding:12px 16px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="lb-dot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block"></span>
+      <b>Generated live by Gemini on Vertex AI</b> · ${isBase?"current baseline":"what-if scenario: "+sc.rain+" mm · "+escapeHtml(sc.track)+" track"} · grounded on live state + citizen reports · ${when}</div>`
+      + buildActionsFrom(j.actions);
+  }catch(err){
+    mount.innerHTML = `<div class="plan-banner" style="border:1px solid rgba(234,179,8,0.4);background:rgba(234,179,8,0.08);color:#f0cf5e;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:4px">
+      ⚠ Live planning failed (${escapeHtml(String(err.message||err).slice(0,90))}) — showing the baseline plan.</div>` + buildActions();
+  }finally{
+    planBusy = false;
+    if(btn){ btn.disabled = false; }
+  }
 }
 
 /* ============================================================
@@ -1202,7 +1297,7 @@ async function askCopilot(q){
     try{
       const ans = BACKEND ? await callBackendChat(q) : await callGemini(key, q);
       if(typing) typing.remove();
-      const src = BACKEND ? "ResilienceAI backend · live" : "gemini-2.5-flash · live";
+      const src = BACKEND ? (ENGINE==="vertex" ? "gemini-2.5-flash · Vertex AI · live" : "ResilienceAI backend · live") : "gemini-2.5-flash · live";
       addMsg("ai", `<p>${escapeHtml(ans).replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')}</p><div class="cite-row"><span class="cite">${src}</span><span class="cite">grounded on city state</span></div>`);
       return;
     }catch(err){
@@ -1317,14 +1412,34 @@ async function callGeminiTriage(key, base64, mimeType, note){
   if(!txt) throw new Error("empty response");
   return parseTriageJson(txt);
 }
-async function callBackendTriage(base64, mimeType, note){
+async function callBackendTriage(base64, mimeType, note, thumbnail){
   const res = await fetch("/api/triage",{
     method:"POST", headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({imageBase64:base64, mimeType:mimeType, note:note})
+    body:JSON.stringify({imageBase64:base64, mimeType:mimeType, note:note, thumbnail:thumbnail||"", source:"command-center"})
   });
   if(!res.ok){ const t=await res.text(); throw new Error("HTTP "+res.status+" "+t.slice(0,120)); }
   const j = await res.json();
-  return normalizeTriage(j);
+  const n = normalizeTriage(j);
+  n.stored = !!j.stored;
+  return n;
+}
+function makeThumb(dataUrl, max){
+  max = max || 240;
+  return new Promise(res=>{
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        const sc = Math.min(1, max/Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.width*sc));
+        c.height = Math.max(1, Math.round(img.height*sc));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        res(c.toDataURL("image/jpeg", 0.7));
+      }catch(e){ res(""); }
+    };
+    img.onerror = ()=>res("");
+    img.src = dataUrl;
+  });
 }
 function demoTriage(){
   const pick = SHOT ? DEMO_TRIAGE_POOL[0] : DEMO_TRIAGE_POOL[Math.floor(Math.random()*DEMO_TRIAGE_POOL.length)];
@@ -1391,6 +1506,66 @@ function addLiveReport(o){
   return card;
 }
 
+/* ---------- Server-persisted reports (Firestore via /api/reports) ---------- */
+function timeAgo(ts){
+  if(!ts) return "earlier";
+  const s = Math.max(0, Date.now()/1000 - ts);
+  if(s<90) return "just now";
+  if(s<3600) return Math.round(s/60)+" min ago";
+  if(s<86400) return Math.round(s/3600)+" h ago";
+  return Math.round(s/86400)+" d ago";
+}
+function buildStoredReportCard(r){
+  const sev = RISK[r.severity] ? r.severity : "MODERATE";
+  const c = RISK[sev].color;
+  const typeLabel = TRIAGE_TYPE_LABEL[r.type] || "Other";
+  const conf = Math.max(0, Math.min(100, Math.round(+r.confidence) || 75));
+  const idText = "CR-" + String(r.id||"").replace(/[^a-zA-Z0-9]/g,"").slice(0,5).toUpperCase();
+  const imgHtml = (r.thumb && /^data:image\//.test(r.thumb))
+    ? `<img src="${r.thumb}" alt="Citizen photo" />`
+    : thumb(TRIAGE_TYPE_THUMB[r.type] || "flood");
+  const card = document.createElement("div");
+  card.className = "report-card rc-live-card rc-server";
+  card.innerHTML = `
+    <div class="rc-live-banner rc-live"><span class="lb-dot"></span>LIVE · Gemini-classified · persisted in Firestore</div>
+    <div class="rc-top">
+      <div class="rc-thumb">${imgHtml}</div>
+      <div class="rc-main">
+        <div class="rc-head"><span class="rc-id">${idText}</span><span class="rc-time">${timeAgo(r.ts)}</span></div>
+        <div class="rc-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(r.district||"Citizen submission")}</div>
+        <div class="rc-text">${escapeHtml(r.summary||r.note||"Citizen report.")}</div>
+      </div>
+    </div>
+    <div class="rc-badges">
+      <span class="badge" style="background:${c}1a;color:${c};border-color:${c}4d">${sev}</span>
+      <span class="badge badge-type">${typeLabel}</span>
+      ${r.duplicate_suspect?`<span class="badge badge-dup"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>possible duplicate</span>`:``}
+      <span class="badge badge-ai"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.4 2.3 7.2L12 16.5 5.7 20.8 8 13.6 2 9.2h7.6z"/></svg>Gemini ${conf}%</span>
+      <span class="conf-mini" style="margin-left:auto">conf <span class="conf-bar"><span style="width:${conf}%"></span></span></span>
+    </div>
+    <div class="rc-actions">
+      <button class="rc-btn verify"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>Verify</button>
+      <button class="rc-btn dismiss"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg>Dismiss</button>
+    </div>`;
+  return card;
+}
+async function refreshServerReports(){
+  try{
+    const res = await fetch("/api/reports?limit=20", {cache:"no-store"});
+    if(!res.ok) return;
+    const j = await res.json();
+    const list = (j.reports||[]).filter(r=>r.summary||r.note);
+    const mount = document.getElementById("reportsMount");
+    if(!mount) return;
+    // fresh uploads from this session already show as rc-live-card; avoid doubling
+    const sessionCards = mount.querySelectorAll(".rc-live-card:not(.rc-server)").length;
+    mount.querySelectorAll(".rc-server").forEach(el=>el.remove());
+    list.slice(sessionCards).reverse().forEach(r=>mount.insertBefore(buildStoredReportCard(r), mount.firstChild));
+    const n = document.getElementById("rpUnverified");
+    if(n) n.textContent = 10 + list.length;
+  }catch(e){}
+}
+
 function showTriageMsg(text, kind){
   const el = document.getElementById("triageMsg");
   if(!el) return;
@@ -1454,7 +1629,7 @@ async function runTriage(){
   const dataUrl = __triageDataUrl;
   try{
     let result, mode;
-    if(BACKEND){ result = await callBackendTriage(base64, mimeType, note); mode = "backend"; }
+    if(BACKEND){ result = await callBackendTriage(base64, mimeType, note, await makeThumb(dataUrl)); mode = "backend"; }
     else if(key){ result = await callGeminiTriage(key, base64, mimeType, note); mode = "live"; }
     else { result = await demoTriage(); mode = "demo"; }
     addLiveReport(Object.assign({imgSrc:dataUrl, note, mode}, result));
@@ -1608,6 +1783,7 @@ function renderDashboard(){
   mapMount.appendChild(buildMap(180,"riverine",document.getElementById("mapTooltip")));
   document.getElementById("mapLegend").innerHTML=buildLegend();
   document.getElementById("forecastMount").innerHTML=buildForecast();
+  document.querySelectorAll(".rain-tab").forEach(b=>b.addEventListener("click",()=>{rainMode=b.dataset.mode;renderDashboard();}));
   document.getElementById("tickerMount").innerHTML=buildTicker();
   const t=new Date(); document.getElementById("syncTime").textContent=t.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
   if(!dashboardRendered){ startTicker(); dashboardRendered=true; }
@@ -1638,6 +1814,10 @@ function wireActions(){
     const open=panel.classList.toggle("open"); btn.classList.toggle("open",open);
     btn.childNodes[0].textContent = open?"Hide reasoning ":"Explain reasoning ";
   });
+  const rb=document.getElementById("regenPlanBtn");
+  if(rb) rb.addEventListener("click",()=>regenPlan({rain:180,track:"riverine"}));
+  const sb=document.getElementById("scenarioPlanBtn");
+  if(sb) sb.addEventListener("click",()=>{ const sc={rain:scRain,track:scTrack}; go("actions"); regenPlan(sc); });
 }
 
 /* Settings modal */
@@ -1647,9 +1827,13 @@ function refreshMode(){
   const badge=document.getElementById("modeBadge");
   if(badge){
     badge.className="mode-badge "+(live?"mode-live":"mode-demo");
-    const label=BACKEND?"Live · ResilienceAI backend":(hasKey?"Live · gemini-2.5-flash":"Demo mode");
+    const label=BACKEND?(ENGINE==="vertex"?"Live · Gemini on Vertex AI":"Live · ResilienceAI backend"):(hasKey?"Live · gemini-2.5-flash":"Demo mode");
     badge.innerHTML=`<span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block"></span> ${label}`;
   }
+  ["regenPlanBtn","scenarioPlanBtn"].forEach(id=>{
+    const b=document.getElementById(id);
+    if(b) b.style.display = BACKEND ? "inline-flex" : "none";
+  });
   const ms=document.getElementById("modalModeStatus");
   if(ms){
     if(BACKEND){ms.style.cssText="background:rgba(34,197,94,0.12);color:#7fe6a5;border:1px solid rgba(34,197,94,0.3)";ms.innerHTML="● Connected to ResilienceAI backend (key managed server-side).";}
