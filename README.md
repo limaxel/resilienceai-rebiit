@@ -31,6 +31,19 @@ It fuses sensor, weather, and citizen data into one live operational picture, th
 
 **Responsible AI by design:** every public-facing action requires human confirmation, and every recommendation explains its reasoning and cites its data.
 
+## Resilient by design
+
+A flood platform that needs good bandwidth, mains power and healthy cell towers fails exactly when it is needed. Power is deliberately cut to flooded districts, networks congest rather than fail cleanly, and cell sites run on a few hours of battery. So the system degrades in layers:
+
+| Failure mode | What still works |
+|---|---|
+| Congested or 2G network | Connection-aware compression: a report drops **378 KB → 33 KB** with identical AI classification |
+| No connectivity at all | Reports are captured offline (service worker + IndexedDB), return immediate safety guidance, and flush automatically via Background Sync |
+| A district goes dark | **Comms blackout detection** — silence is treated as escalation, not safety. The district is flagged as a blind spot with stale readings, and the agents dispatch a field team |
+| AI layer unreachable | Explicit **degraded mode**: deterministic rule-based triage computed from live state, clearly labelled as not-AI — never canned text presented as intelligence |
+
+Try it: the dashboard has a **comms-blackout drill** button, and `/report` works with the network switched off.
+
 ## Architecture
 
 ```mermaid
@@ -57,10 +70,12 @@ flowchart LR
 ## Repo layout
 
 ```
-prototype/index.html   # command center — self-contained single-file web app
-prototype/report.html  # citizen mobile reporting app
-deploy/server.py       # Flask + ADK agents + Firestore + Vertex AI serving layer
-deploy/Dockerfile      # Cloud Run container
+prototype/index.html          # command center — self-contained single-file web app
+prototype/report.html         # citizen mobile reporting app (offline-capable PWA)
+prototype/sw.js               # service worker — offline shell + background sync
+prototype/manifest.webmanifest
+deploy/server.py              # Flask + ADK agents + Firestore + Vertex AI serving layer
+deploy/Dockerfile             # Cloud Run container
 deploy/requirements.txt
 ```
 
