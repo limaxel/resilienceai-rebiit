@@ -220,6 +220,8 @@ button{font-family:inherit}
 .bubble ol,.bubble ul{margin:6px 0 9px;padding-left:20px}
 .bubble li{margin-bottom:5px}
 .bubble strong{color:#fff}
+.bubble em{color:#cfe0f5;font-style:italic}
+.bubble code{background:rgba(148,163,184,0.16);border-radius:4px;padding:1px 5px;font-size:12.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .risk-inline{font-weight:700;padding:1px 6px;border-radius:4px;font-size:11.5px;letter-spacing:.03em}
 .cite-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px;padding-top:10px;border-top:1px solid var(--border)}
 .cite{font-size:10.5px;color:var(--text-dim);background:var(--panel-3);border:1px solid var(--border);padding:3px 9px;border-radius:6px;display:flex;align-items:center;gap:5px}
@@ -425,8 +427,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
       <p>Real-time flood risk across Delta City's 8 districts · tropical storm approaching, monsoon season</p>
     </div>
     <div class="head-tags">
-      <span class="tag"><b>42</b> IoT gauges</span>
-      <span class="tag"><b>Vertex AI</b> forecast · updated 2 min ago</span>
+      <span class="tag"><b>42</b> IoT gauges · simulated</span>
+      <span class="tag"><b>Gemini 2.5</b> on Vertex AI · live</span>
       <span class="tag">Last sync <b id="syncTime">now</b></span>
     </div>
   </div>
@@ -449,7 +451,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
     <div class="panel">
       <div class="panel-head">
         <h2><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M19 9l-5 5-3-3-4 4"/></svg> 72-Hour Risk Forecast</h2>
-        <span class="ph-sub">Riverside North gauge · Vertex AI</span>
+        <span class="ph-sub">Riverside North gauge · hydrological model</span>
       </div>
       <div class="panel-body" id="forecastMount"></div>
     </div>
@@ -458,7 +460,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
   <div class="panel">
     <div class="panel-head">
       <h2><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Live Sensor Stream <span style="font-size:11px;color:var(--low);font-weight:500;margin-left:4px">● streaming</span></h2>
-      <span class="ph-sub">BigQuery ML anomaly detection active</span>
+      <span class="ph-sub">Simulated gauge network · server-synchronised stream</span>
     </div>
     <div class="ticker" id="tickerMount"></div>
   </div>
@@ -476,13 +478,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
       <div class="panel-body">
         <h3>Suggested questions</h3>
         <div id="chipMount"></div>
-        <div class="co-ctx">
+        <div class="co-ctx" id="ctxPanel">
           <div style="font-weight:700;color:var(--text);margin-bottom:7px">Live context in prompt</div>
           <div class="ctx-row"><span>Storm status</span><b>Approaching</b></div>
-          <div class="ctx-row"><span>HIGH-risk districts</span><b>2</b></div>
-          <div class="ctx-row"><span>Population at risk</span><b>1.18M</b></div>
-          <div class="ctx-row"><span>Gauges online</span><b>40 / 42</b></div>
-          <div class="ctx-row"><span>Shelter spaces open</span><b>18,400</b></div>
+          <div class="ctx-row"><span>HIGH-risk districts</span><b id="ctxHigh">2</b></div>
+          <div class="ctx-row"><span>Population at risk</span><b id="ctxPop">1.18M</b></div>
+          <div class="ctx-row"><span>Gauges online</span><b id="ctxSensors">40 / 42</b></div>
+          <div class="ctx-row"><span>Shelter spaces open</span><b id="ctxShelter">18,400</b></div>
         </div>
       </div>
     </div>
@@ -490,7 +492,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
       <div class="chat-head">
         <div style="display:flex;align-items:center;gap:10px">
           <div class="ava ai" style="width:28px;height:28px;border-radius:8px">AI</div>
-          <div><div style="font-weight:600;font-size:13px">Response Assistant</div><div style="font-size:11px;color:var(--muted)">Root agent · Data Analyst + Comms + Response Planner</div></div>
+          <div><div style="font-weight:600;font-size:13px">Response Assistant</div><div style="font-size:11px;color:var(--muted)" id="agentSub">Root agent · Comms + Response Planner</div></div>
         </div>
         <div class="mode-badge mode-demo" id="modeBadge"><span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block"></span> Demo mode</div>
       </div>
@@ -516,7 +518,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
     <div class="head-tags">
       <span class="tag"><b id="rpUnverified">10</b> awaiting review</span>
       <span class="tag"><b>3</b> duplicate clusters</span>
-      <span class="tag">Firestore + Cloud Storage feed</span>
+      <span class="tag">Firestore-backed feed · live</span>
       <a class="tag" href="/report" target="_blank" rel="noopener" style="text-decoration:none;color:var(--accent)">📱 Citizen app → /report</a>
     </div>
   </div>
@@ -558,7 +560,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
   <div class="page-head">
     <div>
       <h1>Ranked Action Recommendations</h1>
-      <p>Response Planner Agent · RAG over emergency SOPs (Vertex AI Search) · human-in-the-loop confirmation required</p>
+      <p>Response Planner agent · generated live by Gemini from current city state and citizen reports · human-in-the-loop confirmation required</p>
     </div>
     <div class="head-tags">
       <span class="tag"><b>6</b> recommendations</span>
@@ -579,7 +581,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
       <p>Adjust rainfall intensity and storm track — risk map and district levels recompute instantly</p>
     </div>
     <div class="head-tags">
-      <span class="tag">Vertex AI forecast model · live recompute</span>
+      <span class="tag">Risk model · instant recompute</span>
+      <span class="tag">Gemini re-plans the response for any scenario</span>
     </div>
   </div>
   <div class="scenario-grid">
@@ -664,7 +667,7 @@ if(SHOT) document.body.classList.add("no-anim");
    On load we probe /api/health; if it returns {mode:"live"} we route all
    Gemini calls through the backend (key managed server-side). On file://
    or with no backend, this fails silently/instantly and behavior is unchanged. */
-let BACKEND = false, ENGINE = null;
+let BACKEND = false, ENGINE = null, AGENTS = null;
 let STATE = null, WEATHER = null;
 async function checkBackend(){
   try{
@@ -675,7 +678,7 @@ async function checkBackend(){
     if(!res.ok) return;
     const j = await res.json();
     if(j && j.mode === "live"){
-      BACKEND = true; ENGINE = j.engine || null; refreshMode();
+      BACKEND = true; ENGINE = j.engine || null; AGENTS = j.agents || null; refreshMode();
       refreshState(); refreshWeather(); refreshServerReports();
       if(!SHOT){ setInterval(refreshState, 20000); setInterval(refreshServerReports, 60000); }
     }
@@ -696,8 +699,20 @@ async function refreshState(){
       const s = SENSOR_POOL.find(x=>x.id===ss.id);
       if(s) s.base = ss.val;
     });
+    renderCtxPanel();
     if(curView==="dashboard") renderDashboard();
   }catch(e){}
+}
+/* Keep the Assistant's "live context" panel honest — same numbers the model sees. */
+function renderCtxPanel(){
+  if(!STATE || !STATE.kpis) return;
+  const k = STATE.kpis;
+  const set = (id, v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  const high = (STATE.districts||[]).filter(d=>d.risk==="HIGH"||d.risk==="SEVERE").length;
+  set("ctxHigh", high);
+  set("ctxPop", fmtCompact(k.popAtRisk));
+  set("ctxSensors", k.sensorsOnline+" / "+k.sensorsTotal);
+  set("ctxShelter", fmtNum(k.shelterOpen));
 }
 async function refreshWeather(){
   try{
@@ -1315,7 +1330,7 @@ async function askCopilot(q){
         const src = BACKEND ? (ENGINE==="vertex" ? "gemini-2.5-flash · Vertex AI · live" : "ResilienceAI backend · live") : "gemini-2.5-flash · live";
         cites = `<span class="cite">${src}</span><span class="cite">grounded on city state</span>`;
       }
-      addMsg("ai", `<p>${escapeHtml(ans).replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')}</p><div class="cite-row">${cites}</div>`);
+      addMsg("ai", mdToHtml(escapeHtml(ans)) + `<div class="cite-row">${cites}</div>`);
       return;
     }catch(err){
       if(typing) typing.remove();
@@ -1362,6 +1377,35 @@ async function callGemini(key, q){
   return txt.trim();
 }
 function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+/* Minimal markdown → HTML for live model answers (input is already escaped). */
+function mdToHtml(escaped){
+  const lines = escaped.split("\n");
+  let out = "", list = null;
+  const inline = s => s
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[\s(])\*(?!\s)([^*]+?)\*(?=[\s.,;:)!?]|$)/g, "$1<em>$2</em>")
+    .replace(/`([^`]+?)`/g, "<code>$1</code>");
+  const closeList = ()=>{ if(list){ out += `</${list}>`; list = null; } };
+  lines.forEach(raw=>{
+    const l = raw.trim();
+    if(!l){ closeList(); return; }
+    const ol = l.match(/^(\d+)[.)]\s+(.*)$/);
+    const ul = l.match(/^[-*•]\s+(.*)$/);
+    if(ol){
+      if(list!=="ol"){ closeList(); out += "<ol>"; list="ol"; }
+      out += "<li>"+inline(ol[2])+"</li>";
+    } else if(ul){
+      if(list!=="ul"){ closeList(); out += "<ul>"; list="ul"; }
+      out += "<li>"+inline(ul[1])+"</li>";
+    } else {
+      closeList();
+      const h = l.match(/^#{1,4}\s+(.*)$/);
+      out += h ? "<p><strong>"+inline(h[1])+"</strong></p>" : "<p>"+inline(l)+"</p>";
+    }
+  });
+  closeList();
+  return out;
+}
 
 /* ============================================================
    LIVE PHOTO TRIAGE (Citizen Reports)
@@ -1858,6 +1902,8 @@ function refreshMode(){
   }
   const hint=document.getElementById("triageModeHint");
   if(hint) hint.textContent=BACKEND?"Live · backend classification":(hasKey?"Live · Gemini classification":"Demo mode · sample classification");
+  const asub=document.getElementById("agentSub");
+  if(asub && AGENTS==="adk") asub.textContent="ADK agent team · Root · Comms · Response Planner · live tools";
 }
 function wireSettings(){
   const ov=document.getElementById("modalOverlay");
@@ -1893,8 +1939,13 @@ function init(){
   document.getElementById("actionsMount").innerHTML=buildActions();
   wireReports(); wireActions(); wireSettings(); wireChat(); wireScenario(); wireTriage();
   refreshMode();
-  // Probe for a ResilienceAI backend (silent/instant no-op on file://).
-  checkBackend();
+  // Probe for a ResilienceAI backend (silent/instant no-op on file://), then run
+  // any auto-actions (?ask= / ?plan=1) used for capturing authentic live states.
+  checkBackend().then(()=>{
+    const ask = params.get("ask");
+    if(ask){ go("assistant"); askCopilot(ask); }
+    if(params.get("plan")==="1"){ go("actions"); regenPlan({rain:180, track:"riverine"}); }
+  });
   // In shot mode, pre-populate a demo-classified example so the card is visible.
   if(SHOT) shotSeedTriage();
   // always pre-render dashboard so it's ready

@@ -7,6 +7,8 @@ assets/
 deck/
 brief.md
 demo_video_guide.md
+submission.md
+*.mp4
 
 # Build copies (synced from prototype/ at deploy time)
 deploy/index.html
